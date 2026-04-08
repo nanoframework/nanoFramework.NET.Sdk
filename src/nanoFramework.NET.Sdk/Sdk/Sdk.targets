@@ -442,7 +442,8 @@
     </GenerateNanoResourceTask>
   </Target>
 
-  <Target Name="NanoGenerateBinaryOutput">
+  <Target Name="NanoGenerateBinaryOutput"
+          DependsOnTargets="ResolveReferences">
     <GenerateBinaryOutputTask
         AssemblyPE="$(NanoFramework_IntermediateAssembly).pe"
         Assembly="$(NanoFramework_Assembly)$(TargetExt)"
