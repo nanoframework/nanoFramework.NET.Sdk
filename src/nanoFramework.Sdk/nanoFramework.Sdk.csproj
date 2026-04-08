@@ -1,0 +1,84 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Packaging project for the nanoFramework.Sdk NuGet package.
+    This project does NOT compile C# code — it packages:
+      1. The Sdk/ directory (Sdk.props, Sdk.targets) at the package root
+      2. Build task DLLs from the nanoFramework.Tools.BuildTasks project
+  -->
+
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <IncludeBuildOutput>false</IncludeBuildOutput>
+    <SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <NoBuild>false</NoBuild>
+  </PropertyGroup>
+
+  <!-- Remove all source from compilation (this is a packaging-only project) -->
+  <ItemGroup>
+    <Compile Remove="**\*.cs" />
+  </ItemGroup>
+
+  <!-- NuGet package metadata -->
+  <PropertyGroup>
+    <PackageId>nanoFramework.Sdk</PackageId>
+    <Title>nanoFramework SDK</Title>
+    <Description>MSBuild SDK for building .NET nanoFramework projects. Enables cross-platform builds with 'dotnet build' using SDK-style project files.</Description>
+    <Authors>nanoframework</Authors>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageProjectUrl>https://github.com/nanoframework/nanoframework-sdk</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/nanoframework/nanoframework-sdk</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageTags>nanoFramework;MSBuild;SDK;IoT;embedded;C#</PackageTags>
+    <Copyright>Copyright (c) .NET Foundation and Contributors</Copyright>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <DevelopmentDependency>true</DevelopmentDependency>
+  </PropertyGroup>
+
+  <!--
+    Build the BuildTasks project first so its output is available for packaging.
+    ReferenceOutputAssembly=false means we do NOT add it as a compile reference.
+  -->
+  <ItemGroup>
+    <ProjectReference Include="..\nanoFramework.Tools.BuildTasks\nanoFramework.Tools.BuildTasks.csproj"
+                      ReferenceOutputAssembly="false"
+                      SkipGetTargetFrameworkProperties="true" />
+  </ItemGroup>
+
+  <!--
+    NuGet package layout:
+      Sdk/
+        Sdk.props
+        Sdk.targets
+      tasks/
+        net472/
+          nanoFramework.Tools.BuildTasks.dll
+        net8.0/
+          nanoFramework.Tools.BuildTasks.dll
+      README.md
+  -->
+  <ItemGroup>
+    <!-- SDK props/targets -->
+    <None Include="Sdk\Sdk.props" Pack="true" PackagePath="Sdk" />
+    <None Include="Sdk\Sdk.targets" Pack="true" PackagePath="Sdk" />
+
+    <!-- Build task DLLs for full-framework MSBuild (VS / msbuild.exe) -->
+    <None Include="..\nanoFramework.Tools.BuildTasks\bin\$(Configuration)\net472\nanoFramework.Tools.BuildTasks.dll"
+          Pack="true" PackagePath="tasks\net472" />
+    <None Include="..\nanoFramework.Tools.BuildTasks\bin\$(Configuration)\net472\nanoFramework.Tools.BuildTasks.pdb"
+          Pack="true" PackagePath="tasks\net472"
+          Condition="Exists('..\nanoFramework.Tools.BuildTasks\bin\$(Configuration)\net472\nanoFramework.Tools.BuildTasks.pdb')" />
+
+    <!-- Build task DLLs for dotnet CLI MSBuild -->
+    <None Include="..\nanoFramework.Tools.BuildTasks\bin\$(Configuration)\net8.0\nanoFramework.Tools.BuildTasks.dll"
+          Pack="true" PackagePath="tasks\net8.0" />
+    <None Include="..\nanoFramework.Tools.BuildTasks\bin\$(Configuration)\net8.0\nanoFramework.Tools.BuildTasks.pdb"
+          Pack="true" PackagePath="tasks\net8.0"
+          Condition="Exists('..\nanoFramework.Tools.BuildTasks\bin\$(Configuration)\net8.0\nanoFramework.Tools.BuildTasks.pdb')" />
+
+    <!-- Package README -->
+    <None Include="..\..\README.md" Pack="true" PackagePath="" />
+  </ItemGroup>
+
+</Project>

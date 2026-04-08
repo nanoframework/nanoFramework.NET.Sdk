@@ -1,0 +1,13 @@
+﻿<Project Sdk="nanoFramework.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Library</OutputType>
+    <RootNamespace>SmokeTest</RootNamespace>
+    <AssemblyName>SmokeTest</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="nanoFramework.CoreLibrary" Version="1.17.11" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,49 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net472</TargetFrameworks>
+    <RootNamespace>nanoFramework.Tools</RootNamespace>
+    <AssemblyName>nanoFramework.Tools.BuildTasks</AssemblyName>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Build.Framework" Version="17.12.6" PrivateAssets="all" ExcludeAssets="runtime" />
+    <PackageReference Include="Microsoft.Build.Utilities.Core" Version="17.11.4" PrivateAssets="all" ExcludeAssets="runtime" />
+  </ItemGroup>
+
+  <!-- System.Drawing is needed for resource processing (bitmap handling in GenerateNanoResourceTask) -->
+  <ItemGroup Condition="'$(TargetFramework)' == 'net472'">
+    <Reference Include="System.Drawing" />
+    <Reference Include="System.Windows.Forms" />
+  </ItemGroup>
+
+  <!--
+    Link source files from the VS extension repository.
+    During Phase 0, source lives in nf-Visual-Studio-extension.
+    Files will be migrated to this project in a later phase.
+  -->
+
+  <!-- Tasks that compile cleanly on both net472 and net8.0 -->
+  <ItemGroup>
+    <Compile Remove="**\*.cs" />
+    <Compile Include="GenerateNanoResourceTask.Stub.cs" />
+    <Compile Include="..\..\..\nf-Visual-Studio-extension\Tools.BuildTasks-2019\GenerateBinaryOutputTask.cs" Link="GenerateBinaryOutputTask.cs" />
+    <Compile Include="..\..\..\nf-Visual-Studio-extension\Tools.BuildTasks-2019\ResolveRuntimeDependenciesTask.cs" Link="ResolveRuntimeDependenciesTask.cs" />
+    <Compile Include="..\..\..\nf-Visual-Studio-extension\Tools.BuildTasks-2019\TasksConstants.cs" Link="TasksConstants.cs" />
+    <Compile Include="..\..\..\nf-Visual-Studio-extension\Tools.BuildTasks-2019\Utilities\DebuggerHelper.cs" Link="Utilities\DebuggerHelper.cs" />
+  </ItemGroup>
+
+  <!--
+    Resource processing tasks use APIs only available on .NET Framework
+    (AppDomain.CreateDomain, BinaryFormatter, ResXResourceReader, System.Drawing).
+    For net8.0, a stub implementation logs a warning. Full resource compilation
+    requires msbuild.exe / Visual Studio (net472).
+  -->
+  <ItemGroup Condition="'$(TargetFramework)' == 'net472'">
+    <Compile Include="..\..\..\nf-Visual-Studio-extension\Tools.BuildTasks-2019\GenerateNanoResourceTask.cs" Link="GenerateNanoResourceTask.cs" />
+    <Compile Include="..\..\..\nf-Visual-Studio-extension\Tools.BuildTasks-2019\ProcessResourceFiles.cs" Link="ProcessResourceFiles.cs" />
+  </ItemGroup>
+
+</Project>
