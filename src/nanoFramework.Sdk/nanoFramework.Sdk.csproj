@@ -12,7 +12,9 @@
     <IncludeBuildOutput>false</IncludeBuildOutput>
     <SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
     <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
-    <NoBuild>false</NoBuild>
+    <!-- Pack as part of Build so the active VS configuration (Debug/Release) is used.
+         Without this, 'dotnet pack' defaults to Release regardless of Configuration Manager. -->
+    <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
   </PropertyGroup>
 
   <!-- Remove all source from compilation (this is a packaging-only project) -->
