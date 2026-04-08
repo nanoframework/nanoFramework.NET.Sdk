@@ -39,11 +39,19 @@
   <!--
     Build the BuildTasks project first so its output is available for packaging.
     ReferenceOutputAssembly=false means we do NOT add it as a compile reference.
+    Two references (one per TFM) with SetTargetFramework force MSBuild to evaluate
+    each as an inner build, where GetTargetPath is defined. Without this, VS MSBuild
+    calls GetTargetPath on the outer cross-targeting build and fails with MSB4057.
   -->
   <ItemGroup>
     <ProjectReference Include="..\nanoFramework.Tools.BuildTasks\nanoFramework.Tools.BuildTasks.csproj"
                       ReferenceOutputAssembly="false"
-                      SkipGetTargetFrameworkProperties="true" />
+                      SkipGetTargetFrameworkProperties="true"
+                      SetTargetFramework="TargetFramework=net8.0" />
+    <ProjectReference Include="..\nanoFramework.Tools.BuildTasks\nanoFramework.Tools.BuildTasks.csproj"
+                      ReferenceOutputAssembly="false"
+                      SkipGetTargetFrameworkProperties="true"
+                      SetTargetFramework="TargetFramework=net472" />
   </ItemGroup>
 
   <!--
