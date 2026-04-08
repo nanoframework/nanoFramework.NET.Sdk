@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <!--
-    Packaging project for the nanoFramework.Sdk NuGet package.
+    Packaging project for the nanoFramework.NET.Sdk NuGet package.
     This project does NOT compile C# code — it packages:
       1. The Sdk/ directory (Sdk.props, Sdk.targets) at the package root
       2. Build task DLLs from the nanoFramework.Tools.BuildTasks project
@@ -24,7 +24,7 @@
 
   <!-- NuGet package metadata -->
   <PropertyGroup>
-    <PackageId>nanoFramework.Sdk</PackageId>
+    <PackageId>nanoFramework.NET.Sdk</PackageId>
     <Title>nanoFramework SDK</Title>
     <Description>MSBuild SDK for building .NET nanoFramework projects. Enables cross-platform builds with 'dotnet build' using SDK-style project files.</Description>
     <Authors>nanoframework</Authors>

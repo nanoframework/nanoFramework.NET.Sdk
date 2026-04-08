@@ -1,4 +1,4 @@
-﻿<Project Sdk="nanoFramework.Sdk">
+﻿<Project Sdk="nanoFramework.NET.Sdk">
 
   <PropertyGroup>
     <OutputType>Library</OutputType>

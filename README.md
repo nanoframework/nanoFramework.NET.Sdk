@@ -55,7 +55,7 @@ src/
 
 ```bash
 dotnet build
-dotnet pack src\nanoFramework.Sdk\nanoFramework.Sdk.csproj
+dotnet pack src\nanoFramework.NET.Sdk\nanoFramework.NET.Sdk.csproj
 ```
 
 The resulting `.nupkg` can be tested locally by adding its output directory as a NuGet source.
