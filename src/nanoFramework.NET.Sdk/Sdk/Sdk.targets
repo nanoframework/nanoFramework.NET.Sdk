@@ -87,9 +87,9 @@
 
   <!-- Stub/skeleton path defaults (after SDK import so TargetName is available) -->
   <PropertyGroup>
-    <NF_GenerateStubsRootName Condition="'$(NF_GenerateStubsRootName)' == ''">$(TargetName)</NF_GenerateStubsRootName>
-    <NF_GenerateSkeletonProjectName Condition="'$(NF_GenerateSkeletonProjectName)' == ''">$(TargetName)</NF_GenerateSkeletonProjectName>
-    <NF_GenerateSkeletonFile>$(NF_GenerateStubsDirectory)\$(NF_GenerateStubsRootName)</NF_GenerateSkeletonFile>
+    <NanoGenerateStubsRootName Condition="'$(NanoGenerateStubsRootName)' == ''">$(TargetName)</NanoGenerateStubsRootName>
+    <NanoGenerateSkeletonProjectName Condition="'$(NanoGenerateSkeletonProjectName)' == ''">$(TargetName)</NanoGenerateSkeletonProjectName>
+    <NanoGenerateSkeletonFile>$(NanoGenerateStubsDirectory)\$(NanoGenerateStubsRootName)</NanoGenerateSkeletonFile>
   </PropertyGroup>
 
   <!-- ============================================================ -->
@@ -310,9 +310,9 @@
           Condition="'$(NanoIsCoreLibrary)' != 'True' and '$(DisableNanoFrameworkMDP)' != 'true'">
 
     <PropertyGroup>
-      <NFMDP_STUB_GenerateSkeletonProject>$(NF_GenerateSkeletonProjectName)</NFMDP_STUB_GenerateSkeletonProject>
-      <NFMDP_STUB_GenerateSkeletonName>$(NF_GenerateStubsRootName)</NFMDP_STUB_GenerateSkeletonName>
-      <NFMDP_STUB_GenerateSkeletonFile>$(NF_GenerateSkeletonFile)</NFMDP_STUB_GenerateSkeletonFile>
+      <NFMDP_STUB_GenerateSkeletonProject>$(NanoGenerateSkeletonProjectName)</NFMDP_STUB_GenerateSkeletonProject>
+      <NFMDP_STUB_GenerateSkeletonName>$(NanoGenerateStubsRootName)</NFMDP_STUB_GenerateSkeletonName>
+      <NFMDP_STUB_GenerateSkeletonFile>$(NanoGenerateSkeletonFile)</NFMDP_STUB_GenerateSkeletonFile>
       <NFMDP_STUB_SkeletonWithoutInterop>false</NFMDP_STUB_SkeletonWithoutInterop>
     </PropertyGroup>
 
@@ -354,9 +354,9 @@
           Condition="'$(NFMDP_GENERATE_PE)' == 'true' and '$(NanoIsCoreLibrary)' == 'True'">
 
     <PropertyGroup>
-      <NFMDP_STUB_GenerateSkeletonProject Condition="'$(NFMDP_STUB_GenerateSkeletonProject)' == ''">$(NF_GenerateSkeletonProjectName)</NFMDP_STUB_GenerateSkeletonProject>
-      <NFMDP_STUB_GenerateSkeletonName Condition="'$(NFMDP_STUB_GenerateSkeletonName)' == ''">$(NF_GenerateStubsRootName)</NFMDP_STUB_GenerateSkeletonName>
-      <NFMDP_STUB_GenerateSkeletonFile Condition="'$(NFMDP_STUB_GenerateSkeletonFile)' == ''">$(NF_GenerateSkeletonFile)</NFMDP_STUB_GenerateSkeletonFile>
+      <NFMDP_STUB_GenerateSkeletonProject Condition="'$(NFMDP_STUB_GenerateSkeletonProject)' == ''">$(NanoGenerateSkeletonProjectName)</NFMDP_STUB_GenerateSkeletonProject>
+      <NFMDP_STUB_GenerateSkeletonName Condition="'$(NFMDP_STUB_GenerateSkeletonName)' == ''">$(NanoGenerateStubsRootName)</NFMDP_STUB_GenerateSkeletonName>
+      <NFMDP_STUB_GenerateSkeletonFile Condition="'$(NFMDP_STUB_GenerateSkeletonFile)' == ''">$(NanoGenerateSkeletonFile)</NFMDP_STUB_GenerateSkeletonFile>
       <NFMDP_STUB_SkeletonWithoutInterop>true</NFMDP_STUB_SkeletonWithoutInterop>
     </PropertyGroup>
 

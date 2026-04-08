@@ -110,11 +110,11 @@
 
   <!-- Stub/skeleton path defaults (project-independent) -->
   <PropertyGroup>
-    <NF_GenerateStubsDirectory Condition="'$(NF_GenerateStubsDirectory)' == ''">$(ProjectDir)Stubs</NF_GenerateStubsDirectory>
+    <NanoGenerateStubsDirectory Condition="'$(NanoGenerateStubsDirectory)' == ''">$(ProjectDir)Stubs</NanoGenerateStubsDirectory>
   </PropertyGroup>
   <!--
-    NOTE: NF_GenerateStubsRootName, NF_GenerateSkeletonProjectName, and
-    NF_GenerateSkeletonFile depend on $(TargetName) which is set after Sdk.props.
+    NOTE: NanoGenerateStubsRootName, NanoGenerateSkeletonProjectName, and
+    NanoGenerateSkeletonFile depend on $(TargetName) which is set after Sdk.props.
     These defaults are in Sdk.targets.
   -->
 
