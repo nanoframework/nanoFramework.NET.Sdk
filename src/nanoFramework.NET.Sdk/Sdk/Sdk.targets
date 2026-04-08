@@ -38,18 +38,18 @@
   </PropertyGroup>
 
   <!-- ============================================================ -->
-  <!--  Metadata Processor defaults (depend on NF_IsCoreLibrary)     -->
-  <!--  Must be in Sdk.targets because NF_IsCoreLibrary is set in   -->
+  <!--  Metadata Processor defaults (depend on NanoIsCoreLibrary)    -->
+  <!--  Must be in Sdk.targets because NanoIsCoreLibrary is set in  -->
   <!--  the project file.                                            -->
   <!-- ============================================================ -->
-  <PropertyGroup Condition="'$(NF_IsCoreLibrary)' == 'True'">
+  <PropertyGroup Condition="'$(NanoIsCoreLibrary)' == 'True'">
     <NFMDP_GENERATE_PE Condition="'$(NFMDP_GENERATE_PE)' == ''">true</NFMDP_GENERATE_PE>
     <NFMDP_DUMP_METADATA Condition="'$(NFMDP_DUMP_METADATA)' == ''">true</NFMDP_DUMP_METADATA>
     <NFMDP_GENERATE_STUBS Condition="'$(NFMDP_GENERATE_STUBS)' == ''">true</NFMDP_GENERATE_STUBS>
     <NFMDP_DAT_FILES Condition="'$(NFMDP_DAT_FILES)' == ''">true</NFMDP_DAT_FILES>
     <NFMDP_XML_FILES Condition="'$(NFMDP_XML_FILES)' == ''">true</NFMDP_XML_FILES>
   </PropertyGroup>
-  <PropertyGroup Condition="'$(NF_IsCoreLibrary)' != 'True'">
+  <PropertyGroup Condition="'$(NanoIsCoreLibrary)' != 'True'">
     <NFMDP_GENERATE_PE Condition="'$(NFMDP_GENERATE_PE)' == ''">false</NFMDP_GENERATE_PE>
     <NFMDP_DUMP_METADATA Condition="'$(NFMDP_DUMP_METADATA)' == ''">false</NFMDP_DUMP_METADATA>
     <NFMDP_GENERATE_STUBS Condition="'$(NFMDP_GENERATE_STUBS)' == ''">false</NFMDP_GENERATE_STUBS>
@@ -186,7 +186,7 @@
   <!-- ============================================================ -->
   <!--  Build pipeline overrides for REGULAR projects                -->
   <!-- ============================================================ -->
-  <PropertyGroup Condition="'$(NF_IsCoreLibrary)' != 'True'">
+  <PropertyGroup Condition="'$(NanoIsCoreLibrary)' != 'True'">
     <MetaDataProcessorDependsOn>Compile;CopyToOutDir</MetaDataProcessorDependsOn>
 
     <CoreBuildDependsOn>
@@ -232,7 +232,7 @@
   <!-- ============================================================ -->
   <!--  Build pipeline overrides for CORE ASSEMBLY projects          -->
   <!-- ============================================================ -->
-  <PropertyGroup Condition="'$(NF_IsCoreLibrary)' == 'True'">
+  <PropertyGroup Condition="'$(NanoIsCoreLibrary)' == 'True'">
     <CoreBuildDependsOn>$(CoreBuildDependsOn);MetaDataProcessorCompile</CoreBuildDependsOn>
     <PrepareResourcesDependsOn>$(PrepareResourcesDependsOn);NanoResourceGenerator</PrepareResourcesDependsOn>
     <CleanDependsOn>$(CleanDependsOn);NanoCLR_CleanExtraFiles</CleanDependsOn>
@@ -307,7 +307,7 @@
           Inputs="$(NanoFramework_Assembly)$(TargetExt);@(ReferencePath);@(ReferenceDependencyPaths);@(NanoFramework_Resources)"
           Outputs="$(NanoFramework_IntermediateAssembly).pe"
           DependsOnTargets="$(MetaDataProcessorDependsOn)"
-          Condition="'$(NF_IsCoreLibrary)' != 'True' and '$(DisableNanoFrameworkMDP)' != 'true'">
+          Condition="'$(NanoIsCoreLibrary)' != 'True' and '$(DisableNanoFrameworkMDP)' != 'true'">
 
     <PropertyGroup>
       <NFMDP_STUB_GenerateSkeletonProject>$(NF_GenerateSkeletonProjectName)</NFMDP_STUB_GenerateSkeletonProject>
@@ -319,7 +319,7 @@
     <MetaDataProcessorTask
         Verbose="$(NFMDP_PE_Verbose)"
         Parse="$(NanoFramework_Assembly)$(TargetExt)"
-        IsCoreLibrary="$(NF_IsCoreLibrary)"
+        IsCoreLibrary="$(NanoIsCoreLibrary)"
         VerboseMinimize="$(NFMDP_PE_VerboseMinimize)"
         DumpMetadata="$(NFMDP_DUMP_METADATA)"
         DumpExports="$(NFMDP_STUB_DumpExports)"
@@ -351,7 +351,7 @@
   <!-- ============================================================ -->
   <Target Name="MetaDataProcessorCompile"
           DependsOnTargets="ResolveRuntimeDependencies"
-          Condition="'$(NFMDP_GENERATE_PE)' == 'true' and '$(NF_IsCoreLibrary)' == 'True'">
+          Condition="'$(NFMDP_GENERATE_PE)' == 'true' and '$(NanoIsCoreLibrary)' == 'True'">
 
     <PropertyGroup>
       <NFMDP_STUB_GenerateSkeletonProject Condition="'$(NFMDP_STUB_GenerateSkeletonProject)' == ''">$(NF_GenerateSkeletonProjectName)</NFMDP_STUB_GenerateSkeletonProject>
@@ -381,7 +381,7 @@
     <MetaDataProcessorTask
         Verbose="$(NFMDP_PE_Verbose)"
         Parse="$(NFMDP_PE_Parse)"
-        IsCoreLibrary="$(NF_IsCoreLibrary)"
+        IsCoreLibrary="$(NanoIsCoreLibrary)"
         VerboseMinimize="$(NFMDP_PE_VerboseMinimize)"
         Compile="$(NFMDP_PE_Compile)"
         DumpMetadata="$(NFMDP_DUMP_METADATA)"
@@ -453,7 +453,7 @@
   </Target>
 
   <!-- Clean extra files for core assembly builds -->
-  <Target Name="NanoCLR_CleanExtraFiles" Condition="'$(NF_IsCoreLibrary)' == 'True'">
+  <Target Name="NanoCLR_CleanExtraFiles" Condition="'$(NanoIsCoreLibrary)' == 'True'">
     <Delete Files="$(NFMDP_PE_Compile);$(NFMDP_PE_Compile_NoExt).pdbx;$(NFMDP_PE_DumpExports);$(NFMDP_PE_GenerateDependency)"
             TreatErrorsAsWarnings="true" />
   </Target>

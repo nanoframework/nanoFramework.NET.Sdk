@@ -100,7 +100,7 @@
 
   <!-- ============================================================ -->
   <!--  Metadata Processor defaults                                  -->
-  <!--  NOTE: NF_IsCoreLibrary-dependent defaults are in Sdk.targets -->
+  <!--  NOTE: NanoIsCoreLibrary-dependent defaults are in Sdk.targets -->
   <!--  because the property is set in the project file.             -->
   <!-- ============================================================ -->
   <PropertyGroup>
