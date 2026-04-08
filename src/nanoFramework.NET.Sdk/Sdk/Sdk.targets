@@ -32,7 +32,6 @@
     <GenerateAssemblyVersionAttribute>false</GenerateAssemblyVersionAttribute>
     <GenerateNeutralResourcesLanguageAttribute>false</GenerateNeutralResourcesLanguageAttribute>
     <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
-    <SkipResolvePackageAssets>true</SkipResolvePackageAssets>
     <!-- Roslyn requires runtimemetadataversion when building core assembly -->
     <CompilerResponseFile>$(ProjectDir)coreAssembly.rsp</CompilerResponseFile>
   </PropertyGroup>
