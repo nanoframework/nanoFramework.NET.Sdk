@@ -64,7 +64,6 @@
       README.md
   -->
   <ItemGroup>
-    <!-- SDK props/targets -->
     <None Include="..\..\assets\nf-logo.png">
       <Pack>True</Pack>
       <PackagePath>\</PackagePath>
@@ -73,6 +72,8 @@
       <Pack>True</Pack>
       <PackagePath>\</PackagePath>
     </None>
+
+    <!-- SDK props/targets -->
     <None Include="Sdk\Sdk.props" Pack="true" PackagePath="Sdk" />
     <None Include="Sdk\Sdk.targets" Pack="true" PackagePath="Sdk" />
 
