@@ -25,10 +25,9 @@
   <!-- NuGet package metadata -->
   <PropertyGroup>
     <PackageId>nanoFramework.NET.Sdk</PackageId>
-    <Title>nanoFramework SDK</Title>
+    <Title>nanoFramework .NET SDK</Title>
     <Description>MSBuild SDK for building .NET nanoFramework projects. Enables cross-platform builds with 'dotnet build' using SDK-style project files.</Description>
     <Authors>nanoframework</Authors>
-    <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageProjectUrl>https://github.com/nanoframework/nanoframework-sdk</PackageProjectUrl>
     <RepositoryUrl>https://github.com/nanoframework/nanoframework-sdk</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
@@ -36,6 +35,8 @@
     <Copyright>Copyright (c) .NET Foundation and Contributors</Copyright>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <DevelopmentDependency>true</DevelopmentDependency>
+    <PackageLicenseFile>LICENSE.md</PackageLicenseFile>
+    <PackageIcon>nf-logo.png</PackageIcon>
   </PropertyGroup>
 
   <!--
@@ -46,14 +47,8 @@
     calls GetTargetPath on the outer cross-targeting build and fails with MSB4057.
   -->
   <ItemGroup>
-    <ProjectReference Include="..\nanoFramework.Tools.BuildTasks\nanoFramework.Tools.BuildTasks.csproj"
-                      ReferenceOutputAssembly="false"
-                      SkipGetTargetFrameworkProperties="true"
-                      SetTargetFramework="TargetFramework=net8.0" />
-    <ProjectReference Include="..\nanoFramework.Tools.BuildTasks\nanoFramework.Tools.BuildTasks.csproj"
-                      ReferenceOutputAssembly="false"
-                      SkipGetTargetFrameworkProperties="true"
-                      SetTargetFramework="TargetFramework=net472" />
+    <ProjectReference Include="..\nanoFramework.Tools.BuildTasks\nanoFramework.Tools.BuildTasks.csproj" ReferenceOutputAssembly="false" SkipGetTargetFrameworkProperties="true" SetTargetFramework="TargetFramework=net8.0" />
+    <ProjectReference Include="..\nanoFramework.Tools.BuildTasks\nanoFramework.Tools.BuildTasks.csproj" ReferenceOutputAssembly="false" SkipGetTargetFrameworkProperties="true" SetTargetFramework="TargetFramework=net472" />
   </ItemGroup>
 
   <!--
@@ -70,22 +65,24 @@
   -->
   <ItemGroup>
     <!-- SDK props/targets -->
+    <None Include="..\..\assets\nf-logo.png">
+      <Pack>True</Pack>
+      <PackagePath>\</PackagePath>
+    </None>
+    <None Include="..\..\LICENSE.md">
+      <Pack>True</Pack>
+      <PackagePath>\</PackagePath>
+    </None>
     <None Include="Sdk\Sdk.props" Pack="true" PackagePath="Sdk" />
     <None Include="Sdk\Sdk.targets" Pack="true" PackagePath="Sdk" />
 
     <!-- Build task DLLs for full-framework MSBuild (VS / msbuild.exe) -->
-    <None Include="..\nanoFramework.Tools.BuildTasks\bin\$(Configuration)\net472\nanoFramework.Tools.BuildTasks.dll"
-          Pack="true" PackagePath="tasks\net472" />
-    <None Include="..\nanoFramework.Tools.BuildTasks\bin\$(Configuration)\net472\nanoFramework.Tools.BuildTasks.pdb"
-          Pack="true" PackagePath="tasks\net472"
-          Condition="Exists('..\nanoFramework.Tools.BuildTasks\bin\$(Configuration)\net472\nanoFramework.Tools.BuildTasks.pdb')" />
+    <None Include="..\nanoFramework.Tools.BuildTasks\bin\$(Configuration)\net472\nanoFramework.Tools.BuildTasks.dll" Pack="true" PackagePath="tasks\net472" />
+    <None Include="..\nanoFramework.Tools.BuildTasks\bin\$(Configuration)\net472\nanoFramework.Tools.BuildTasks.pdb" Pack="true" PackagePath="tasks\net472" Condition="Exists('..\nanoFramework.Tools.BuildTasks\bin\$(Configuration)\net472\nanoFramework.Tools.BuildTasks.pdb')" />
 
     <!-- Build task DLLs for dotnet CLI MSBuild -->
-    <None Include="..\nanoFramework.Tools.BuildTasks\bin\$(Configuration)\net8.0\nanoFramework.Tools.BuildTasks.dll"
-          Pack="true" PackagePath="tasks\net8.0" />
-    <None Include="..\nanoFramework.Tools.BuildTasks\bin\$(Configuration)\net8.0\nanoFramework.Tools.BuildTasks.pdb"
-          Pack="true" PackagePath="tasks\net8.0"
-          Condition="Exists('..\nanoFramework.Tools.BuildTasks\bin\$(Configuration)\net8.0\nanoFramework.Tools.BuildTasks.pdb')" />
+    <None Include="..\nanoFramework.Tools.BuildTasks\bin\$(Configuration)\net8.0\nanoFramework.Tools.BuildTasks.dll" Pack="true" PackagePath="tasks\net8.0" />
+    <None Include="..\nanoFramework.Tools.BuildTasks\bin\$(Configuration)\net8.0\nanoFramework.Tools.BuildTasks.pdb" Pack="true" PackagePath="tasks\net8.0" Condition="Exists('..\nanoFramework.Tools.BuildTasks\bin\$(Configuration)\net8.0\nanoFramework.Tools.BuildTasks.pdb')" />
 
     <!-- Package README -->
     <None Include="..\..\README.md" Pack="true" PackagePath="" />
