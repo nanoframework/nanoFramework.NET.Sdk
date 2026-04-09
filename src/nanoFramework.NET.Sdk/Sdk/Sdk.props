@@ -57,7 +57,7 @@
   <!--  C# Compiler settings for nanoFramework                       -->
   <!-- ============================================================ -->
   <PropertyGroup>
-    <LangVersion Condition="'$(LangVersion)' == ''">9.0</LangVersion>
+    <LangVersion Condition="'$(LangVersion)' == ''">13.0</LangVersion>
 
     <!-- Prevent standard .NET library references — nanoFramework provides its own mscorlib -->
     <NoStdLib>true</NoStdLib>
