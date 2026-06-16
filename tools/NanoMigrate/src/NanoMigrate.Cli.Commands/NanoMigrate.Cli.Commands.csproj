@@ -45,6 +45,7 @@
     <Using Include="NanoFramework.Migrate.Core.Verification" />
     <Using Include="NanoFramework.Migrate.Core.Fleet" />
     <Using Include="NanoFramework.Migrate.Core.Common" />
+    <Using Include="NanoFramework.Migrate.Core.Reporting" />
   </ItemGroup>
 
 </Project>

@@ -17,6 +17,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\NanoMigrate.Core\NanoMigrate.Core.csproj" />
+    <!-- Referenced so the report smoke test can drive the shared migrate command. -->
+    <ProjectReference Include="..\..\src\NanoMigrate.Cli.Commands\NanoMigrate.Cli.Commands.csproj" />
   </ItemGroup>
 
   <!-- The engine is organized into vertical-slice sub-namespaces; surface them all
@@ -28,6 +30,7 @@
     <Using Include="NanoFramework.Migrate.Core.Verification" />
     <Using Include="NanoFramework.Migrate.Core.Fleet" />
     <Using Include="NanoFramework.Migrate.Core.Common" />
+    <Using Include="NanoFramework.Migrate.Core.Reporting" />
   </ItemGroup>
 
 </Project>

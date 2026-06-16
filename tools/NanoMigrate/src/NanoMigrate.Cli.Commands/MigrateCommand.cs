@@ -64,6 +64,12 @@ public sealed class MigrateSettings : AssumeYesSettings
     [Description("Skip the post-migration build verification.")]
     public bool NoVerify { get; init; }
 
+    [CommandOption("--report <path>")]
+    [Description("Write a migration report to this path. The format is chosen by the extension: "
+               + ".md/.markdown -> Markdown, .html/.htm -> HTML (anything else -> Markdown). "
+               + "Works for --dry-run too (reports what WOULD change).")]
+    public string? Report { get; init; }
+
     public override ValidationResult Validate()
     {
         if (Ext is not (".nfproj" or ".csproj"))
@@ -141,7 +147,8 @@ public sealed class MigrateCommand : Command<MigrateSettings>
         var results = ProcessProjects(targets, baseDir, o);
         journal?.Save();
 
-        var report = Report(results, baseDir, o, rewritten: Array.Empty<string>());
+        var rewritten = Array.Empty<string>();
+        var report = Report(results, baseDir, o, rewritten);
 
         // Verification targets in loose mode are the converted projects themselves
         // (no host-owned solution set). A failed verify can roll the run back.
@@ -149,7 +156,8 @@ public sealed class MigrateCommand : Command<MigrateSettings>
             .Where(r => r.Result.Status is ConvertStatus.Converted or ConvertStatus.Review)
             .Select(r => r.Result.OutputPath)
             .ToList();
-        return VerifyAndMaybeRollback(report, verifyTargets, journal, baseDir, settings, o);
+        var reportCtx = new ReportContext(results, baseDir, o.DryRun, rewritten, settings.Report);
+        return VerifyAndMaybeRollback(report, verifyTargets, journal, baseDir, settings, o, reportCtx);
     }
 
     // The solution-aware flow: pick the candidate solutions (multi-select / confirm),
@@ -222,7 +230,8 @@ public sealed class MigrateCommand : Command<MigrateSettings>
 
         // Verify by building exactly the chosen solutions.
         var verifyTargets = chosen.Select(c => c.Solution.Path).ToList();
-        return VerifyAndMaybeRollback(report, verifyTargets, journal, baseDir, settings, o);
+        var reportCtx = new ReportContext(results, baseDir, o.DryRun, rewritten, settings.Report);
+        return VerifyAndMaybeRollback(report, verifyTargets, journal, baseDir, settings, o, reportCtx);
     }
 
     // Opens a rollback journal rooted at baseDir for real runs only; dry-runs return
@@ -255,10 +264,14 @@ public sealed class MigrateCommand : Command<MigrateSettings>
     // Maps to the final exit code. When verification is off/clean, returns the
     // already-computed migrate exit code unchanged.
     private int VerifyAndMaybeRollback(int migrateExit, List<string> verifyTargets,
-        RollbackJournal? journal, string baseDir, MigrateSettings settings, ConversionOptions o)
+        RollbackJournal? journal, string baseDir, MigrateSettings settings, ConversionOptions o,
+        ReportContext reportCtx)
     {
         if (!o.VerifyEffective || verifyTargets.Count == 0)
+        {
+            WriteReportIfRequested(reportCtx, verify: null);
             return migrateExit;
+        }
 
         var builder = new SolutionBuilder();
         List<BuildOutcome> outcomes;
@@ -281,6 +294,11 @@ public sealed class MigrateCommand : Command<MigrateSettings>
             AnsiConsole.MarkupLine("[yellow]warning:[/] dotnet not found on PATH — build verification skipped.");
 
         MigrateRenderer.RenderVerifyTable(outcomes, baseDir);
+
+        // Write the report (when requested) now that the verify outcomes are known, so
+        // a single write covers the passed-and-failed paths alike. A subsequent
+        // rollback reverts files on disk but the report still records what was attempted.
+        WriteReportIfRequested(reportCtx, outcomes);
 
         var verifyOutcome = Verification.Evaluate(outcomes);
         if (verifyOutcome != VerifyOutcome.Failed)
@@ -416,6 +434,40 @@ public sealed class MigrateCommand : Command<MigrateSettings>
         var flagged = results.Count(r => r.Result.Status == ConvertStatus.Review);
         if (errors > 0) return 1;
         return flagged > 0 ? 2 : 0;
+    }
+
+    // The data needed to render the optional migration report, carried from the
+    // outcome computation through the verify pass so a single write site can include
+    // the verify results when a verify pass ran. ReportPath is null when --report
+    // was not supplied.
+    private readonly record struct ReportContext(
+        IReadOnlyList<ProjectOutcome> Results,
+        string BaseDir,
+        bool DryRun,
+        IReadOnlyList<string> Rewritten,
+        string? ReportPath);
+
+    // Builds the MigrationReport from the same outcome/verify data the summary table
+    // used and writes it to the requested path (format chosen by extension), printing
+    // a Spectre line. A no-op when --report was not supplied. The caller (Core) owns
+    // the clock: the timestamp is captured here, not inside the engine.
+    private static void WriteReportIfRequested(ReportContext ctx, IReadOnlyList<BuildOutcome>? verify)
+    {
+        if (string.IsNullOrWhiteSpace(ctx.ReportPath)) return;
+
+        var report = MigrationReportBuilder.Build(
+            ctx.Results, ctx.BaseDir, ctx.DryRun, ctx.Rewritten, verify, DateTime.UtcNow);
+
+        try
+        {
+            var format = MigrationReportBuilder.Write(report, ctx.ReportPath);
+            var kind = format == ReportFormat.Html ? "HTML" : "Markdown";
+            AnsiConsole.MarkupLine($"[grey]{kind} report written to[/] [blue]{Esc(ctx.ReportPath)}[/]");
+        }
+        catch (Exception ex)
+        {
+            AnsiConsole.MarkupLine($"[yellow]warning:[/] could not write report to [blue]{Esc(ctx.ReportPath)}[/]: {Esc(ex.Message)}");
+        }
     }
 
     // Runs every conversion, surfacing progress with a spinner. Any per-project
