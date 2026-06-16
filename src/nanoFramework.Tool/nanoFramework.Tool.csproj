@@ -5,28 +5,28 @@
     <TargetFramework>net8.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <AssemblyName>nano-migrate</AssemblyName>
-    <RootNamespace>NanoFramework.Migrate.Cli</RootNamespace>
+    <AssemblyName>nano</AssemblyName>
+    <RootNamespace>NanoFramework.Tool</RootNamespace>
     <InvariantGlobalization>true</InvariantGlobalization>
     <!-- Run through the `dotnet` host rather than a native launcher, so the tool
          works even where the build output directory is mounted noexec. -->
     <UseAppHost>false</UseAppHost>
   </PropertyGroup>
 
-  <!-- Packaged as a .NET global/local tool: `nano-migrate`. -->
+  <!-- Packaged as the `dotnet nano` umbrella .NET tool. -->
   <PropertyGroup>
     <PackAsTool>true</PackAsTool>
-    <ToolCommandName>nano-migrate</ToolCommandName>
-    <PackageId>nanoFramework.Migrate</PackageId>
-    <Title>nanoFramework Migrate (CLI)</Title>
-    <Description>Command-line tool that migrates legacy nanoFramework .nfproj projects to the SDK-style MSBuild project system — one project, a directory, or an entire cloned fleet. Built on the nanoFramework.Migrate.Core engine.</Description>
+    <ToolCommandName>nano</ToolCommandName>
+    <PackageId>nanoFramework.Tool</PackageId>
+    <Title>nanoFramework CLI (dotnet nano)</Title>
+    <Description>The single `dotnet nano &lt;command&gt;` CLI for nanoFramework. Hosts built-in managed commands (migrate, deploy, monitor, devices) and wraps prebuilt external tools (e.g. nanoff via `flash`) under one uniform Spectre.Console UX.</Description>
     <Authors>nanoFramework</Authors>
     <Company>nanoFramework</Company>
     <PackageProjectUrl>https://github.com/nanoframework/nanoframework-sdk</PackageProjectUrl>
     <RepositoryUrl>https://github.com/nanoframework/nanoframework-sdk</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageTags>nanoFramework;MSBuild;SDK;migration;nfproj;dotnet-tool;IoT;embedded;C#</PackageTags>
+    <PackageTags>nanoFramework;CLI;dotnet-tool;migrate;flash;nanoff;IoT;embedded;C#</PackageTags>
     <Copyright>Copyright (c) .NET Foundation and Contributors</Copyright>
     <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
   </PropertyGroup>
@@ -40,10 +40,15 @@
   </ItemGroup>
 
   <ItemGroup>
-    <!-- The shared `migrate` command + its Spectre rendering live here so the
-         standalone CLI and the `dotnet nano` umbrella share one implementation.
-         NanoMigrate.Core flows transitively through this reference. -->
-    <ProjectReference Include="..\NanoMigrate.Cli.Commands\NanoMigrate.Cli.Commands.csproj" />
+    <!-- The built-in `migrate` command is the shared Spectre command sitting over
+         the NanoMigrate.Core engine; reused verbatim from the standalone CLI. -->
+    <ProjectReference Include="..\..\tools\NanoMigrate\src\NanoMigrate.Cli.Commands\NanoMigrate.Cli.Commands.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The external-tool manifest is embedded so resolution/fetch is deterministic
+         and ships inside the tool package. -->
+    <EmbeddedResource Include="ExternalTools\nano-tools.json" />
   </ItemGroup>
 
 </Project>

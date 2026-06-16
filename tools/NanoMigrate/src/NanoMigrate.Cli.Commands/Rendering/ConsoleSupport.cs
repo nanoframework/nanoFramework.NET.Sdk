@@ -3,7 +3,7 @@ using Spectre.Console;
 namespace NanoFramework.Migrate.Cli.Rendering;
 
 /// <summary>Shared, low-level console helpers. The only consumers of AnsiConsole.</summary>
-internal static class ConsoleSupport
+public static class ConsoleSupport
 {
     // A "title rule" header. Spectre renders this as a centred rule when the
     // terminal is wide enough, and degrades to plain text when redirected.

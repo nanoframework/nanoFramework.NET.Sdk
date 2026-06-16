@@ -6,10 +6,10 @@ using static NanoFramework.Migrate.Cli.Rendering.ConsoleSupport;
 namespace NanoFramework.Migrate.Cli.Rendering;
 
 /// <summary>Pairs a source .nfproj path with its conversion outcome.</summary>
-internal readonly record struct ProjectOutcome(string Nfproj, ConvertResult Result);
+public readonly record struct ProjectOutcome(string Nfproj, ConvertResult Result);
 
 /// <summary>Spectre presentation for the migrate command. Consumes Core's data.</summary>
-internal static class MigrateRenderer
+public static class MigrateRenderer
 {
     public static void RenderSummaryTable(List<ProjectOutcome> results, string baseDir, bool dryRun)
     {

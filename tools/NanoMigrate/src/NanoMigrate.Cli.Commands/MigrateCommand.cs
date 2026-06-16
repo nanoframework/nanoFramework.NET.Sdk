@@ -7,7 +7,7 @@ using static NanoFramework.Migrate.Cli.Rendering.ConsoleSupport;
 
 namespace NanoFramework.Migrate.Cli.Commands;
 
-internal sealed class MigrateSettings : CommandSettings
+public sealed class MigrateSettings : CommandSettings
 {
     [CommandArgument(0, "<path>")]
     [Description("A .nfproj file, a solution (.sln/.slnx), or a directory. "
@@ -65,7 +65,7 @@ internal sealed class MigrateSettings : CommandSettings
     };
 }
 
-internal sealed class MigrateCommand : Command<MigrateSettings>
+public sealed class MigrateCommand : Command<MigrateSettings>
 {
     private readonly IProjectConverter _converter = new ProjectConverter();
 
