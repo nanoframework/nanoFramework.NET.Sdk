@@ -29,6 +29,9 @@ public sealed class ProjectConverter : IProjectConverter
     {
         "RootNamespace", "AssemblyName", "DocumentationFile", "DefineConstants", "LangVersion",
         "Description", "Authors", "PackageTags", "Copyright",
+        // nanoFramework unit-test projects: these keep the migrated project a test
+        // project (the SDK does not infer them).
+        "IsTestProject", "TestProjectType", "RunSettingsFilePath",
     };
 
     // Legacy <Reference Include="X"> names whose NuGet package id differs from X.
@@ -68,12 +71,33 @@ public sealed class ProjectConverter : IProjectConverter
         }
 
         var pkgs = LoadPackagesConfig(projDir);
+        // packages.config — when present and non-empty — IS the authoritative
+        // dependency list. In that mode legacy <Reference> assembly names are NOT
+        // mapped to packages (their names routinely differ from the NuGet package
+        // id, e.g. assembly "System.Net.Http" ships in package
+        // "nanoFramework.System.Net.Http.Server"); the packages.config ids+versions
+        // are taken verbatim instead, eliminating the name/id mismatch.
+        var packagesConfigAuthoritative = pkgs.Count > 0;
+
+        // Detect Central Package Management: an explicit option override wins;
+        // otherwise walk up for a Directory.Packages.props with
+        // ManagePackageVersionsCentrally=true.
+        var cpmPropsPath = FindDirectoryPackagesProps(projDir);
+        var cpmActive = o.CentralPackageManagement
+            ?? (cpmPropsPath is not null && IsCpmEnabled(cpmPropsPath));
 
         var props = new List<KeyValuePair<string, string>>();   // discovery order, deduped
         var pkgRefs = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         var projRefs = new List<string>();
         var keepItems = new List<XElement>();
         var review = new List<string>();
+
+        // Seed package references straight from packages.config when it is the
+        // authoritative source. Drop the legacy <Reference> elements entirely in
+        // this mode (handled in the item loop below).
+        if (packagesConfigAuthoritative)
+            foreach (var kv in pkgs)
+                pkgRefs[kv.Key] = kv.Value;
 
         void SetProp(string k, string? v)
         {
@@ -101,6 +125,11 @@ public sealed class ProjectConverter : IProjectConverter
                 {
                     case "Reference":
                     {
+                        // packages.config is authoritative: it already carries the
+                        // full dependency set, so legacy <Reference> assembly names
+                        // are dropped rather than (mis)mapped to a package id.
+                        if (packagesConfigAuthoritative) break;
+
                         var rawName = inc.Split(',')[0].Trim();
                         // Prefer id+version parsed straight from the HintPath folder.
                         var fromHint = InferFromHintPath(el);
@@ -121,8 +150,13 @@ public sealed class ProjectConverter : IProjectConverter
                     }
                     case "PackageReference":
                     {
+                        // A versionless <PackageReference> is valid under CPM; carry
+                        // it through (its version, if any, comes from the central
+                        // props). Otherwise resolve a version from the attribute or
+                        // packages.config; only flag when truly unresolvable.
                         var ver = (string?)el.Attribute("Version") ?? pkgs.GetValueOrDefault(inc);
                         if (ver is not null) pkgRefs[inc] = ver;
+                        else if (cpmActive) pkgRefs.TryAdd(inc, "");   // version lives in central props
                         else
                             review.Add($"PackageReference without resolvable version: {inc} "
                                      + "(add a Version manually)");
@@ -143,6 +177,12 @@ public sealed class ProjectConverter : IProjectConverter
                     case "Content":
                         keepItems.Add(el);
                         break;
+                    case "ProjectCapability":
+                        // nanoFramework test projects mark themselves with
+                        // <ProjectCapability Include="TestContainer" />; this is a
+                        // meaningful item the SDK does not supply, so carry it through.
+                        keepItems.Add(el);
+                        break;
                     default:
                         review.Add($"Unhandled item <{tag} Include='{inc}'>");
                         break;
@@ -151,7 +191,7 @@ public sealed class ProjectConverter : IProjectConverter
 
         FoldNuspec(projDir, SetProp);
 
-        var xml = Emit(props, pkgRefs, projRefs, keepItems, o);
+        var xml = Emit(props, pkgRefs, projRefs, keepItems, o, cpmActive);
 
         var outPath = Path.ChangeExtension(Path.GetFullPath(nfproj), o.Ext);
         var nfFull = Path.GetFullPath(nfproj);
@@ -160,6 +200,23 @@ public sealed class ProjectConverter : IProjectConverter
         var result = new ConvertResult { OutputPath = outPath };
         result.Review.AddRange(review);
         result.Packages.AddRange(pkgRefs.OrderBy(k => k.Key, StringComparer.OrdinalIgnoreCase));
+
+        // Under CPM, each referenced id must have a <PackageVersion> in the nearest
+        // Directory.Packages.props. Compute the ids whose version we know (from
+        // packages.config / HintPath) that are missing from the central props, and
+        // record them; the real run adds them idempotently below. Versionless ids
+        // (no resolvable version) cannot seed a PackageVersion and are left as-is.
+        var cpmAdditions = new List<KeyValuePair<string, string>>();
+        if (cpmActive && cpmPropsPath is not null)
+        {
+            var existing = LoadPackageVersionIds(cpmPropsPath);
+            foreach (var kv in pkgRefs.OrderBy(k => k.Key, StringComparer.OrdinalIgnoreCase))
+                if (!string.IsNullOrEmpty(kv.Value) && !existing.Contains(kv.Key))
+                    cpmAdditions.Add(kv);
+            foreach (var add in cpmAdditions)
+                result.AddedPackageVersions.Add(add);
+            if (cpmAdditions.Count > 0) result.UpdatedPackagesProps = cpmPropsPath;
+        }
 
         // Compute the set of files that will be (or, in dry-run, would be) removed
         // and the solutions that will be retargeted. This drives the dry-run
@@ -180,6 +237,10 @@ public sealed class ProjectConverter : IProjectConverter
             // survive reruns.
             if (!o.NoBackup && !File.Exists(nfproj + ".bak")) File.Copy(nfproj, nfproj + ".bak", overwrite: false);
             File.WriteAllText(outPath, xml, new UTF8Encoding(false));
+            // Add any missing <PackageVersion> entries to the central props,
+            // idempotently (existing entries are neither duplicated nor reordered).
+            if (cpmActive && cpmPropsPath is not null && cpmAdditions.Count > 0)
+                AddPackageVersions(cpmPropsPath, cpmAdditions);
             // If we emitted a .csproj alongside, retire the original .nfproj.
             if (replacingNfproj)
             {
@@ -269,6 +330,129 @@ public sealed class ProjectConverter : IProjectConverter
             if (id is not null && ver is not null) result[id] = ver;
         }
         return result;
+    }
+
+    // Walks UP from the project directory looking for the nearest
+    // Directory.Packages.props (the file MSBuild itself would pick for CPM). Returns
+    // its full path, or null if none exists in the ancestor chain. Pure: read-only.
+    private static string? FindDirectoryPackagesProps(string projDir)
+    {
+        var dir = new DirectoryInfo(Path.GetFullPath(projDir));
+        while (dir is not null)
+        {
+            var candidate = Path.Combine(dir.FullName, "Directory.Packages.props");
+            if (File.Exists(candidate)) return candidate;
+            dir = dir.Parent;
+        }
+        return null;
+    }
+
+    // True when a Directory.Packages.props opts into CPM via
+    // <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>.
+    // A malformed/unreadable file is treated as "not enabled" (never throws).
+    private static bool IsCpmEnabled(string propsPath)
+    {
+        try
+        {
+            var root = XElement.Load(propsPath);
+            var flag = root.Descendants()
+                .FirstOrDefault(e => e.Name.LocalName == "ManagePackageVersionsCentrally");
+            return flag is not null
+                && bool.TryParse(flag.Value.Trim(), out var on) && on;
+        }
+        catch { return false; }
+    }
+
+    // The set of package ids already declared as <PackageVersion> in a
+    // Directory.Packages.props. Used to avoid duplicating entries on add/re-run.
+    private static HashSet<string> LoadPackageVersionIds(string propsPath)
+    {
+        var ids = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        try
+        {
+            foreach (var pv in XElement.Load(propsPath).Descendants()
+                         .Where(e => e.Name.LocalName == "PackageVersion"))
+            {
+                var id = (string?)pv.Attribute("Include");
+                if (!string.IsNullOrEmpty(id)) ids.Add(id);
+            }
+        }
+        catch { /* unreadable props → treat as having no entries */ }
+        return ids;
+    }
+
+    // Idempotently inserts <PackageVersion Include="id" Version="ver" /> entries for
+    // the given (id, version) pairs into the nearest ItemGroup of a
+    // Directory.Packages.props. Existing entries are neither duplicated nor
+    // reordered; only genuinely-missing ids are appended. Preserves the file's
+    // namespace and overall shape. Caller has already filtered to missing ids.
+    private static void AddPackageVersions(string propsPath, IEnumerable<KeyValuePair<string, string>> additions)
+    {
+        var toAdd = additions.ToList();
+        if (toAdd.Count == 0) return;
+
+        var doc = System.Xml.Linq.XDocument.Load(propsPath, System.Xml.Linq.LoadOptions.PreserveWhitespace);
+        var root = doc.Root!;
+        var ns = root.Name.Namespace;
+        var existing = root.Descendants().Where(e => e.Name.LocalName == "PackageVersion")
+            .Select(e => (string?)e.Attribute("Include"))
+            .Where(s => !string.IsNullOrEmpty(s))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        // Reuse the ItemGroup that already holds PackageVersion items; otherwise the
+        // first ItemGroup; otherwise create a fresh one.
+        var group = root.Elements().FirstOrDefault(e => e.Name.LocalName == "ItemGroup"
+                        && e.Elements().Any(c => c.Name.LocalName == "PackageVersion"))
+                 ?? root.Elements().FirstOrDefault(e => e.Name.LocalName == "ItemGroup");
+        if (group is null)
+        {
+            group = new XElement(ns + "ItemGroup");
+            root.Add(group);
+        }
+
+        // Match the indentation of an existing PackageVersion so appended entries
+        // line up; fall back to a sensible default for a freshly-created group.
+        var indent = ElementIndent(group.Elements()
+            .FirstOrDefault(c => c.Name.LocalName == "PackageVersion")) ?? "    ";
+
+        // The last PackageVersion to append after (so new entries sit with the rest,
+        // before the ItemGroup's closing tag rather than after its trailing newline).
+        var anchor = group.Elements().LastOrDefault(c => c.Name.LocalName == "PackageVersion");
+
+        foreach (var kv in toAdd)
+        {
+            if (existing.Contains(kv.Key)) continue;  // idempotent guard
+            var pv = new XElement(ns + "PackageVersion",
+                new XAttribute("Include", kv.Key),
+                new XAttribute("Version", kv.Value));
+            if (anchor is not null)
+            {
+                anchor.AddAfterSelf(pv);
+                anchor.AddAfterSelf(new System.Xml.Linq.XText("\n" + indent));
+            }
+            else
+            {
+                group.AddFirst(pv);
+                group.AddFirst(new System.Xml.Linq.XText("\n" + indent));
+            }
+            anchor = pv;
+            existing.Add(kv.Key);
+        }
+
+        doc.Save(propsPath);
+    }
+
+    // The leading-whitespace indentation of an element, read from the immediately
+    // preceding whitespace text node. Null if there is no such node (or no element).
+    private static string? ElementIndent(XElement? el)
+    {
+        if (el?.PreviousNode is System.Xml.Linq.XText t)
+        {
+            var s = t.Value;
+            var nl = s.LastIndexOf('\n');
+            return nl >= 0 ? s[(nl + 1)..] : s;
+        }
+        return null;
     }
 
     // Removes a hand-written AssemblyInfo.cs from disk. With the SDK's default
@@ -362,7 +546,8 @@ public sealed class ProjectConverter : IProjectConverter
         Dictionary<string, string> pkgRefs,
         List<string> projRefs,
         List<XElement> keepItems,
-        ConversionOptions o)
+        ConversionOptions o,
+        bool cpmActive)
     {
         var sb = new StringBuilder();
         // Versionless SDK reference; the version is pinned via global.json msbuild-sdks.
@@ -377,7 +562,11 @@ public sealed class ProjectConverter : IProjectConverter
         {
             sb.Append("  <ItemGroup>\n");
             foreach (var kv in pkgRefs.OrderBy(k => k.Key, StringComparer.OrdinalIgnoreCase))
-                sb.Append($"    <PackageReference Include=\"{kv.Key}\" Version=\"{kv.Value}\" />\n");
+                // Under CPM the version belongs in the central props, not here — a
+                // Version attribute would trip NU1008. Otherwise pin it inline.
+                sb.Append(cpmActive
+                    ? $"    <PackageReference Include=\"{kv.Key}\" />\n"
+                    : $"    <PackageReference Include=\"{kv.Key}\" Version=\"{kv.Value}\" />\n");
             sb.Append("  </ItemGroup>\n\n");
         }
         if (projRefs.Count > 0)

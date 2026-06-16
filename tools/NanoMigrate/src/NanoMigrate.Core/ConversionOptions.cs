@@ -45,4 +45,16 @@ public sealed record ConversionOptions
     /// list is still populated. Default false preserves the historical behavior.
     /// </summary>
     public bool SkipSolutionRewrite { get; init; }
+
+    /// <summary>
+    /// Central Package Management (CPM) override. <c>null</c> (the default) means
+    /// auto-detect: the converter walks up from the project directory for a
+    /// <c>Directory.Packages.props</c> with
+    /// <c>&lt;ManagePackageVersionsCentrally&gt;true&lt;/ManagePackageVersionsCentrally&gt;</c>.
+    /// Set <c>true</c>/<c>false</c> to force CPM on/off regardless of what is on disk.
+    /// When CPM is active the emitted <c>PackageReference</c> elements are versionless
+    /// and each referenced id is ensured to have a <c>PackageVersion</c> entry in the
+    /// nearest <c>Directory.Packages.props</c>.
+    /// </summary>
+    public bool? CentralPackageManagement { get; init; }
 }

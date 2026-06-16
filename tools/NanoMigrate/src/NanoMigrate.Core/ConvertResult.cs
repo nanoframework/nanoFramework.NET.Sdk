@@ -40,6 +40,19 @@ public sealed class ConvertResult
     /// <summary>.sln files this conversion retargets (or, in dry-run, would retarget).</summary>
     public List<string> UpdatedSolutions { get; } = new();
 
+    /// <summary>
+    /// Under Central Package Management, the <c>Directory.Packages.props</c> this
+    /// conversion adds <c>PackageVersion</c> entries to (or, in dry-run, would add).
+    /// Null when CPM is inactive or no entries are missing.
+    /// </summary>
+    public string? UpdatedPackagesProps { get; set; }
+
+    /// <summary>
+    /// The <c>PackageVersion</c> entries (id -> version) added to the central
+    /// <c>Directory.Packages.props</c> under CPM (or, in dry-run, that would be added).
+    /// </summary>
+    public List<KeyValuePair<string, string>> AddedPackageVersions { get; } = new();
+
     /// <summary>Set when the conversion threw; used to render a red Error row.</summary>
     public string? Error { get; set; }
 
