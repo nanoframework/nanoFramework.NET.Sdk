@@ -1,6 +1,8 @@
 using System.Text;
+using NanoFramework.Migrate.Core.Common;
+using NanoFramework.Migrate.Core.Projects;
 
-namespace NanoFramework.Migrate.Core;
+namespace NanoFramework.Migrate.Core.Fleet;
 
 /// <summary>Result of a single git invocation. Mirrors a process exit.</summary>
 public readonly record struct GitResult(int Code, string Stdout, string Stderr);

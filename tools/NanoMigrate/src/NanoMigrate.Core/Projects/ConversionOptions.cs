@@ -1,4 +1,4 @@
-namespace NanoFramework.Migrate.Core;
+namespace NanoFramework.Migrate.Core.Projects;
 
 /// <summary>
 /// The knobs that drive a conversion. This is the engine-facing options type — it

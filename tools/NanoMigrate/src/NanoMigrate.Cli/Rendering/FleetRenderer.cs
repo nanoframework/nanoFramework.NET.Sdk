@@ -1,5 +1,4 @@
 using System.Text;
-using NanoFramework.Migrate.Core;
 using Spectre.Console;
 using static NanoFramework.Migrate.Cli.Rendering.ConsoleSupport;
 

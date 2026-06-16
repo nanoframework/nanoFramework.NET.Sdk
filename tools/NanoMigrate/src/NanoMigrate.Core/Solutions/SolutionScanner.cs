@@ -1,4 +1,4 @@
-namespace NanoFramework.Migrate.Core;
+namespace NanoFramework.Migrate.Core.Solutions;
 
 /// <summary>
 /// Discovers Visual Studio solution files (<c>.sln</c> and <c>.slnx</c>) beneath a

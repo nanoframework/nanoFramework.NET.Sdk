@@ -1,4 +1,3 @@
-using NanoFramework.Migrate.Core;
 using Xunit;
 
 namespace NanoFramework.Migrate.Tests;

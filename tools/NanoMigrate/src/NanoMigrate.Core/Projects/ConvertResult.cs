@@ -1,4 +1,4 @@
-namespace NanoFramework.Migrate.Core;
+namespace NanoFramework.Migrate.Core.Projects;
 
 /// <summary>How a single project ended up after a (dry-run or real) conversion.</summary>
 public enum ConvertStatus

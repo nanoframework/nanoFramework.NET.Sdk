@@ -1,4 +1,4 @@
-namespace NanoFramework.Migrate.Core;
+namespace NanoFramework.Migrate.Core.Common;
 
 /// <summary>
 /// Enumerates <c>.nfproj</c> files under a path, with an optional glob filter.

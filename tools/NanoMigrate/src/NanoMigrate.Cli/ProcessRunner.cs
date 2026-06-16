@@ -1,5 +1,4 @@
 using System.Diagnostics;
-using NanoFramework.Migrate.Core;
 
 namespace NanoFramework.Migrate.Cli;
 

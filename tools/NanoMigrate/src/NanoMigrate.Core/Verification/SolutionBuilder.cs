@@ -1,6 +1,6 @@
 using System.Diagnostics;
 
-namespace NanoFramework.Migrate.Core;
+namespace NanoFramework.Migrate.Core.Verification;
 
 /// <summary>
 /// The outcome of verifying one target (a solution or a project) by building it.

@@ -3,7 +3,7 @@ using System.Xml.Linq;
 using Microsoft.VisualStudio.SolutionPersistence.Model;
 using Microsoft.VisualStudio.SolutionPersistence.Serializer;
 
-namespace NanoFramework.Migrate.Core;
+namespace NanoFramework.Migrate.Core.Solutions;
 
 /// <summary>The on-disk format of a Visual Studio solution.</summary>
 public enum SolutionFormat

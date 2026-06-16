@@ -1,4 +1,4 @@
-namespace NanoFramework.Migrate.Core;
+namespace NanoFramework.Migrate.Core.Backup;
 
 /// <summary>The leftovers a clean would remove, gathered for preview before deletion.</summary>
 public sealed class CleanPlan

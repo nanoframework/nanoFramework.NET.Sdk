@@ -1,4 +1,6 @@
-namespace NanoFramework.Migrate.Core;
+using NanoFramework.Migrate.Core.Common;
+
+namespace NanoFramework.Migrate.Core.Solutions;
 
 /// <summary>
 /// How the migration target was specified, which decides whether the CLI must

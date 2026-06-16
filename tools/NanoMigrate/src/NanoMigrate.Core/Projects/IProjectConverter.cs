@@ -1,4 +1,4 @@
-namespace NanoFramework.Migrate.Core;
+namespace NanoFramework.Migrate.Core.Projects;
 
 /// <summary>
 /// Converts a single legacy <c>.nfproj</c> into an SDK-style project. The result

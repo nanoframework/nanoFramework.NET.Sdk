@@ -1,5 +1,4 @@
 using System.ComponentModel;
-using NanoFramework.Migrate.Core;
 using NanoFramework.Migrate.Cli.Rendering;
 using Spectre.Console;
 using Spectre.Console.Cli;

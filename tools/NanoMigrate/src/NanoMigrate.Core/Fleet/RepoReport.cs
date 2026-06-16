@@ -1,4 +1,4 @@
-namespace NanoFramework.Migrate.Core;
+namespace NanoFramework.Migrate.Core.Fleet;
 
 /// <summary>Per-repo outcome accumulated by the fleet command. Pure data.</summary>
 public sealed class RepoReport

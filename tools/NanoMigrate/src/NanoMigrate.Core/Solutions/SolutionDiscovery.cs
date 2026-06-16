@@ -1,4 +1,4 @@
-namespace NanoFramework.Migrate.Core;
+namespace NanoFramework.Migrate.Core.Solutions;
 
 /// <summary>
 /// Given a set of target <c>.nfproj</c> paths, finds which discovered solutions

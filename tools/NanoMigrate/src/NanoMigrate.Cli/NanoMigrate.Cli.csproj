@@ -46,4 +46,15 @@
     <ProjectReference Include="..\NanoMigrate.Cli.Commands\NanoMigrate.Cli.Commands.csproj" />
   </ItemGroup>
 
+  <!-- The engine is organized into vertical-slice sub-namespaces; surface them all
+       as global usings so the CLI layer can reference Core types unqualified. -->
+  <ItemGroup>
+    <Using Include="NanoFramework.Migrate.Core.Projects" />
+    <Using Include="NanoFramework.Migrate.Core.Solutions" />
+    <Using Include="NanoFramework.Migrate.Core.Backup" />
+    <Using Include="NanoFramework.Migrate.Core.Verification" />
+    <Using Include="NanoFramework.Migrate.Core.Fleet" />
+    <Using Include="NanoFramework.Migrate.Core.Common" />
+  </ItemGroup>
+
 </Project>

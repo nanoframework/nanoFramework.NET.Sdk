@@ -1,4 +1,4 @@
-namespace NanoFramework.Migrate.Core;
+namespace NanoFramework.Migrate.Core.Verification;
 
 /// <summary>What the command should do after the verification build(s) ran.</summary>
 public enum VerifyOutcome

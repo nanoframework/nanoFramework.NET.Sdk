@@ -1,4 +1,6 @@
-namespace NanoFramework.Migrate.Core;
+using NanoFramework.Migrate.Core.Projects;
+
+namespace NanoFramework.Migrate.Core.Backup;
 
 /// <summary>
 /// Bridges a (dry-run) <see cref="ConvertResult"/> preview into a
