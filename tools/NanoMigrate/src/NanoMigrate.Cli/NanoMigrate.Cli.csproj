@@ -1,0 +1,46 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AssemblyName>nano-migrate</AssemblyName>
+    <RootNamespace>NanoFramework.Migrate.Cli</RootNamespace>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <!-- Run through the `dotnet` host rather than a native launcher, so the tool
+         works even where the build output directory is mounted noexec. -->
+    <UseAppHost>false</UseAppHost>
+  </PropertyGroup>
+
+  <!-- Packaged as a .NET global/local tool: `nano-migrate`. -->
+  <PropertyGroup>
+    <PackAsTool>true</PackAsTool>
+    <ToolCommandName>nano-migrate</ToolCommandName>
+    <PackageId>nanoFramework.Migrate</PackageId>
+    <Title>nanoFramework Migrate (CLI)</Title>
+    <Description>Command-line tool that migrates legacy nanoFramework .nfproj projects to the SDK-style MSBuild project system — one project, a directory, or an entire cloned fleet. Built on the nanoFramework.Migrate.Core engine.</Description>
+    <Authors>nanoFramework</Authors>
+    <Company>nanoFramework</Company>
+    <PackageProjectUrl>https://github.com/nanoframework/nanoframework-sdk</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/nanoframework/nanoframework-sdk</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageTags>nanoFramework;MSBuild;SDK;migration;nfproj;dotnet-tool;IoT;embedded;C#</PackageTags>
+    <Copyright>Copyright (c) .NET Foundation and Contributors</Copyright>
+    <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Polished CLI: header rules, progress, summary tables, panels, trees.
+         0.55.0 is the latest pair where Spectre.Console and Spectre.Console.Cli
+         share a stable version (Spectre.Console.Cli has no 0.57.0 release). -->
+    <PackageReference Include="Spectre.Console" Version="0.55.0" />
+    <PackageReference Include="Spectre.Console.Cli" Version="0.55.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\NanoMigrate.Core\NanoMigrate.Core.csproj" />
+  </ItemGroup>
+
+</Project>

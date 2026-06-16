@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>NanoFramework.Migrate.Core</RootNamespace>
+    <AssemblyName>NanoMigrate.Core</AssemblyName>
+    <InvariantGlobalization>true</InvariantGlobalization>
+  </PropertyGroup>
+
+  <!-- NuGet package metadata. Pack explicitly (GeneratePackageOnBuild off). -->
+  <PropertyGroup>
+    <PackageId>nanoFramework.Migrate.Core</PackageId>
+    <Title>nanoFramework Migrate (Core)</Title>
+    <Description>Conversion engine that migrates legacy nanoFramework .nfproj projects to the SDK-style MSBuild project system: folds packages.config into PackageReference and .nuspec metadata into Pack properties. Console-free library; see the nano-migrate CLI for an interactive front end.</Description>
+    <Authors>nanoFramework</Authors>
+    <Company>nanoFramework</Company>
+    <PackageProjectUrl>https://github.com/nanoframework/nanoframework-sdk</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/nanoframework/nanoframework-sdk</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageTags>nanoFramework;MSBuild;SDK;migration;nfproj;IoT;embedded;C#</PackageTags>
+    <Copyright>Copyright (c) .NET Foundation and Contributors</Copyright>
+    <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
+  </PropertyGroup>
+
+</Project>

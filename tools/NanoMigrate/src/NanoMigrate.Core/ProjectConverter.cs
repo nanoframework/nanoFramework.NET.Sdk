@@ -2,44 +2,7 @@ using System.Text;
 using System.Text.RegularExpressions;
 using System.Xml.Linq;
 
-namespace NanoFramework.Migrate;
-
-/// <summary>How a single project ended up after a (dry-run or real) conversion.</summary>
-internal enum ConvertStatus
-{
-    Converted,   // converted cleanly
-    Skipped,     // already SDK-style; nothing to do
-    Review,      // converted, but flagged items need a human
-    Error,       // threw while converting
-}
-
-/// <summary>Outcome of converting a single project.</summary>
-internal sealed class ConvertResult
-{
-    public required string OutputPath { get; init; }
-    public List<string> Review { get; } = new();
-
-    /// <summary>True when the project was already SDK-style and was left untouched.</summary>
-    public bool AlreadySdk { get; set; }
-
-    /// <summary>Resolved PackageReferences (id -> version) the emitted project will carry.</summary>
-    public List<KeyValuePair<string, string>> Packages { get; } = new();
-
-    /// <summary>Files this conversion deletes (or, in dry-run, would delete).</summary>
-    public List<string> DeletedFiles { get; } = new();
-
-    /// <summary>.sln files this conversion retargets (or, in dry-run, would retarget).</summary>
-    public List<string> UpdatedSolutions { get; } = new();
-
-    /// <summary>Set when the conversion threw; used to render a red Error row.</summary>
-    public string? Error { get; set; }
-
-    public ConvertStatus Status =>
-        Error is not null ? ConvertStatus.Error
-        : AlreadySdk       ? ConvertStatus.Skipped
-        : Review.Count > 0 ? ConvertStatus.Review
-        :                    ConvertStatus.Converted;
-}
+namespace NanoFramework.Migrate.Core;
 
 /// <summary>
 /// Converts one legacy .nfproj into an SDK-style project. Faithful to the
@@ -49,7 +12,7 @@ internal sealed class ConvertResult
 /// and "fail loud" — anything it cannot confidently convert is surfaced for a
 /// human rather than guessed.
 /// </summary>
-internal static class Converter
+public sealed class ProjectConverter : IProjectConverter
 {
     private static readonly XNamespace Ns = "http://schemas.microsoft.com/developer/msbuild/2003";
 
@@ -87,8 +50,10 @@ internal static class Converter
     // global.json `msbuild-sdks` entry, not the Sdk attribute.
     private const string SdkReference = "nanoFramework.NET.Sdk";
 
-    public static ConvertResult Convert(string nfproj, Options o)
+    public ConvertResult Convert(string nfprojPath, ConversionOptions options)
     {
+        var nfproj = nfprojPath;
+        var o = options;
         var projDir = Path.GetDirectoryName(Path.GetFullPath(nfproj))!;
         var root = XElement.Load(nfproj);
 
@@ -457,7 +422,7 @@ internal static class Converter
         Dictionary<string, string> pkgRefs,
         List<string> projRefs,
         List<XElement> keepItems,
-        Options o)
+        ConversionOptions o)
     {
         var sb = new StringBuilder();
         // Versionless SDK reference; the version is pinned via global.json msbuild-sdks.
