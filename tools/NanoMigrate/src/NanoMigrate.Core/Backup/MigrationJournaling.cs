@@ -14,6 +14,13 @@ namespace NanoFramework.Migrate.Core.Backup;
 /// (the .csproj it creates) and <see cref="ConvertResult.UpdatedSolutions"/> /
 /// <see cref="ConvertResult.UpdatedPackagesProps"/> (the files it rewrites). We
 /// journal all of those.
+///
+/// The journal is SELF-CONTAINED: every original it must restore (the .nfproj,
+/// packages.config, Properties/AssemblyInfo.cs, and any touched .sln/.slnx/
+/// Directory.Packages.props) is copied INTO <c>.nanomigrate/rollback-&lt;id&gt;/</c>,
+/// and rollback restores from there only. It does NOT depend on the converter's loose
+/// next-to-project <c>*.nfproj.bak</c>, so a <c>--no-backup</c> migration (which writes
+/// no loose .bak at all) is still fully reversible.
 /// </summary>
 public static class MigrationJournaling
 {

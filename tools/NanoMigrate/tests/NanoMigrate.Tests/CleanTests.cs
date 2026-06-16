@@ -47,6 +47,30 @@ public class CleanTests
     }
 
     [Fact]
+    public void Clean_does_not_count_journal_internal_nfproj_backups_as_loose_backups()
+    {
+        using var dir = new TempDir();
+
+        // A --no-backup real migration: zero loose .bak, but the journal keeps its own
+        // "<seq>-Sample.nfproj.bak" copy of the original .nfproj inside .nanomigrate/.
+        var nfproj = dir.File("Sample.nfproj", Nfproj);
+        var journal = RollbackJournal.Start(dir.Path);
+        journal.BackupBeforeChange(nfproj);     // -> .nanomigrate/rollback-<id>/0000-Sample.nfproj.bak
+        journal.Save();
+
+        var plan = BackupCleaner.Plan(dir.Path);
+
+        // The journal-internal .nfproj.bak must NOT be listed as a loose backup; the
+        // whole .nanomigrate folder is the single rollback-folder leftover instead.
+        Assert.Empty(plan.BackupFiles);
+        Assert.Single(plan.RollbackFolders);
+
+        // Clean still removes the .nanomigrate folder wholesale.
+        BackupCleaner.Remove(plan);
+        Assert.False(Directory.Exists(Path.Combine(dir.Path, RollbackJournal.FolderName)));
+    }
+
+    [Fact]
     public void Clean_on_a_tree_with_no_leftovers_is_an_empty_noop()
     {
         using var dir = new TempDir();

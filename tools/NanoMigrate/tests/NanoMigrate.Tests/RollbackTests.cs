@@ -96,6 +96,67 @@ public class RollbackTests
     }
 
     [Fact]
+    public void Real_migrate_with_no_backup_writes_zero_loose_bak_but_journal_rolls_back_byte_for_byte()
+    {
+        using var dir = new TempDir();
+        var nfproj = dir.File("Sample.nfproj", Nfproj);
+        var pc = dir.File("packages.config", PackagesConfig);
+        var ai = dir.File(Path.Combine("Properties", "AssemblyInfo.cs"), AssemblyInfo);
+        var sln = dir.File("Sample.sln", SolutionText());
+        var csproj = dir.Combine("Sample.csproj");
+
+        var nfprojBytes = File.ReadAllBytes(nfproj);
+        var pcBytes = File.ReadAllBytes(pc);
+        var aiBytes = File.ReadAllBytes(ai);
+        var slnBytes = File.ReadAllBytes(sln);
+
+        // A real migration with --no-backup: the loose *.nfproj.bak must NOT be written.
+        var journal = MigrateWithJournal(dir.Path, nfproj, new ConversionOptions { NoBackup = true });
+
+        // The migration happened.
+        Assert.True(File.Exists(csproj));
+        Assert.False(File.Exists(nfproj));
+
+        // ZERO loose, next-to-project .nfproj.bak anywhere outside the journal folder.
+        var nanomigrate = Path.Combine(dir.Path, RollbackJournal.FolderName);
+        var looseBaks = Directory.EnumerateFiles(dir.Path, "*.nfproj.bak", SearchOption.AllDirectories)
+            .Where(p => !Path.GetFullPath(p).StartsWith(Path.GetFullPath(nanomigrate), StringComparison.OrdinalIgnoreCase))
+            .ToList();
+        Assert.Empty(looseBaks);
+
+        // …but the journal IS present and self-contained.
+        Assert.True(Directory.Exists(nanomigrate));
+        Assert.True(File.Exists(journal.ManifestPath));
+
+        // Rolling back from the journal restores every original byte-for-byte and
+        // removes the created .csproj — proving the journal does NOT depend on the
+        // loose .bak that --no-backup suppressed.
+        var result = RollbackJournal.ApplyAndCleanup(journal.ManifestPath);
+        Assert.NotNull(result);
+        Assert.Empty(result!.Problems);
+
+        Assert.False(File.Exists(csproj));
+        Assert.Equal(nfprojBytes, File.ReadAllBytes(nfproj));
+        Assert.Equal(pcBytes, File.ReadAllBytes(pc));
+        Assert.Equal(aiBytes, File.ReadAllBytes(ai));
+        Assert.Equal(slnBytes, File.ReadAllBytes(sln));
+    }
+
+    [Fact]
+    public void Real_migrate_without_no_backup_still_writes_the_loose_bak()
+    {
+        using var dir = new TempDir();
+        var nfproj = dir.File("Sample.nfproj", Nfproj);
+        dir.File("packages.config", PackagesConfig);
+
+        // Default options (backups enabled) keep the historical loose .bak alongside.
+        MigrateWithJournal(dir.Path, nfproj, new ConversionOptions());
+
+        Assert.True(File.Exists(nfproj + ".bak"));
+        Assert.Equal(Nfproj, File.ReadAllText(nfproj + ".bak"));
+    }
+
+    [Fact]
     public void Rollback_is_safe_with_no_journal()
     {
         using var dir = new TempDir();

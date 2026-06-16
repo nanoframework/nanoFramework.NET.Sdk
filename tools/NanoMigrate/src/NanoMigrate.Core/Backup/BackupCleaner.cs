@@ -58,8 +58,14 @@ public static class BackupCleaner
         // A single file argument: only its sibling .bak makes sense; treat its dir as root.
         var scanRoot = Directory.Exists(full) ? full : Path.GetDirectoryName(full)!;
 
+        // Loose, next-to-project backups only — the opt-in `--backup` artifact. The
+        // rollback journal keeps its OWN copy of the original .nfproj inside
+        // .nanomigrate/rollback-<id>/ under a "<seq>-<name>.nfproj.bak" name; those are
+        // part of the self-contained journal (removed as a whole folder below) and must
+        // NOT be counted as loose backups, else clean double-reports them.
         foreach (var bak in SafeEnumerateFiles(scanRoot, "*.nfproj.bak"))
-            plan.BackupFiles.Add(Path.GetFullPath(bak));
+            if (!IsInsideRollbackFolder(bak))
+                plan.BackupFiles.Add(Path.GetFullPath(bak));
 
         foreach (var dir in SafeEnumerateDirectories(scanRoot, RollbackJournal.FolderName))
             plan.RollbackFolders.Add(Path.GetFullPath(dir));
@@ -98,6 +104,20 @@ public static class BackupCleaner
         }
 
         return result;
+    }
+
+    // True when a path lies anywhere beneath a ".nanomigrate" rollback folder. Such
+    // files are the journal's self-contained backups, not loose next-to-project ones.
+    private static bool IsInsideRollbackFolder(string path)
+    {
+        var dir = Path.GetDirectoryName(Path.GetFullPath(path));
+        while (!string.IsNullOrEmpty(dir))
+        {
+            if (string.Equals(Path.GetFileName(dir), RollbackJournal.FolderName, StringComparison.OrdinalIgnoreCase))
+                return true;
+            dir = Path.GetDirectoryName(dir);
+        }
+        return false;
     }
 
     private static IEnumerable<string> SafeEnumerateFiles(string root, string pattern)

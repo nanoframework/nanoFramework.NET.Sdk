@@ -295,8 +295,13 @@ public sealed class ProjectConverter : IProjectConverter
 
         if (!o.DryRun)
         {
-            // Never clobber an existing backup: the original first-run .bak must
-            // survive reruns.
+            // The loose, next-to-project *.nfproj.bak is purely the opt-in backup
+            // convenience: it is written ONLY when backups are enabled (default) and
+            // suppressed entirely under --no-backup. The rollback journal does NOT rely
+            // on it — the journal keeps its own copy of the original .nfproj inside
+            // .nanomigrate/rollback-<id>/ — so a --no-backup run leaves zero loose .bak
+            // yet is still fully reversible. Never clobber an existing backup: the
+            // original first-run .bak must survive reruns.
             if (!o.NoBackup && !File.Exists(nfproj + ".bak")) File.Copy(nfproj, nfproj + ".bak", overwrite: false);
             File.WriteAllText(outPath, xml, new UTF8Encoding(false));
             // Add any missing <PackageVersion> entries to the central props,
