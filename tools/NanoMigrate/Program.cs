@@ -52,7 +52,13 @@ internal static class Program
     {
         var path = o.Positional ?? throw new UserError("migrate needs a path to a .nfproj or a directory");
         var targets = ResolveProjects(path);
-        if (targets.Count == 0) throw new UserError($"no .nfproj found under '{path}'");
+        // Reentrant: a fully-converted tree has no .nfproj left. Exit cleanly (0) rather than
+        // erroring, so re-running the converter over a repo is a safe no-op.
+        if (targets.Count == 0)
+        {
+            Console.WriteLine($"nothing to convert: no .nfproj found under '{path}' (already SDK-style?).");
+            return 0;
+        }
 
         var allReview = new List<string>();
         foreach (var nf in targets)
