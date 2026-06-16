@@ -25,4 +25,11 @@
     <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
   </PropertyGroup>
 
+  <ItemGroup>
+    <!-- Official .NET Foundation solution (.sln/.slnx) reader/writer. We parse and
+         re-serialize solutions through this library rather than hand-rolling the
+         line/XML format, so only the nfproj->csproj retarget logic lives here. -->
+    <PackageReference Include="Microsoft.VisualStudio.SolutionPersistence" Version="1.0.52" />
+  </ItemGroup>
+
 </Project>

@@ -1,5 +1,7 @@
-using System.Text.RegularExpressions;
+using System.Text;
 using System.Xml.Linq;
+using Microsoft.VisualStudio.SolutionPersistence.Model;
+using Microsoft.VisualStudio.SolutionPersistence.Serializer;
 
 namespace NanoFramework.Migrate.Core;
 
@@ -9,24 +11,26 @@ public enum SolutionFormat
     /// <summary>Classic line-based <c>.sln</c> (each project has a type GUID).</summary>
     Classic,
 
-    /// <summary>XML <c>.slnx</c> (path-based; no per-project type GUID).</summary>
+    /// <summary>XML <c>.slnx</c> (path-based).</summary>
     Xml,
 }
 
 /// <summary>
 /// Parsed model of a Visual Studio solution — both the classic <c>.sln</c> line
-/// format and the newer XML <c>.slnx</c> format. Exposes the referenced project
-/// paths (absolute) and the format. Pure: parsing reads the file, nothing else.
+/// format and the newer XML <c>.slnx</c> format. Backed by the .NET Foundation
+/// <c>Microsoft.VisualStudio.SolutionPersistence</c> serializers: the library does
+/// all of the parsing and (on retarget) re-serialization; this type only exposes the
+/// referenced project paths (absolute) and the format, and drives the nfproj→csproj
+/// retarget through the model.
 /// </summary>
 public sealed class SolutionFile
 {
-    // The project-declaration line of a classic .sln:
-    //   Project("{type-guid}") = "Name", "rel\path.ext", "{project-guid}"
-    // We only need the *path* (the second quoted value). The capture is
-    // separator- and extension-agnostic; callers filter on .nfproj/.csproj.
-    private static readonly Regex ClassicProjectLine = new(
-        "^\\s*Project\\(\"\\{[^}]*\\}\"\\)\\s*=\\s*\"[^\"]*\"\\s*,\\s*\"(?<path>[^\"]+)\"",
-        RegexOptions.Compiled | RegexOptions.IgnoreCase);
+    // The legacy nanoFramework project-type GUID. A flavored .nfproj carries this in a
+    // classic .sln, and VS writes it as the Type attribute in a .slnx. The serializer
+    // does not know the .nfproj extension, so a .slnx that references a bare .nfproj
+    // (no Type attribute) cannot be parsed as-is; we inject this Type for those
+    // entries before handing the text to the library (see LoadSlnxModel).
+    internal const string NfprojTypeGuid = "{11A8DD76-328B-46DF-9F39-F559912D0360}";
 
     /// <summary>Absolute path to the solution file.</summary>
     public string Path { get; }
@@ -36,8 +40,7 @@ public sealed class SolutionFile
 
     /// <summary>
     /// Every project the solution references, as an absolute path. Solution folders
-    /// (which in a classic <c>.sln</c> are "projects" whose path equals the folder
-    /// name, with no separator and no project extension) are excluded.
+    /// are excluded (the library models them separately from projects).
     /// </summary>
     public IReadOnlyList<string> ProjectPaths { get; }
 
@@ -58,11 +61,14 @@ public sealed class SolutionFile
     {
         var full = System.IO.Path.GetFullPath(solutionPath);
         var dir = System.IO.Path.GetDirectoryName(full)!;
-        var text = File.ReadAllText(full);
+        var isXml = full.EndsWith(".slnx", StringComparison.OrdinalIgnoreCase);
 
-        return full.EndsWith(".slnx", StringComparison.OrdinalIgnoreCase)
-            ? new SolutionFile(full, SolutionFormat.Xml, ParseSlnx(text, dir))
-            : new SolutionFile(full, SolutionFormat.Classic, ParseClassic(text, dir));
+        var model = LoadModel(full, isXml);
+        var paths = model.SolutionProjects
+            .Select(p => System.IO.Path.GetFullPath(System.IO.Path.Combine(dir, p.FilePath)))
+            .ToList();
+
+        return new SolutionFile(full, isXml ? SolutionFormat.Xml : SolutionFormat.Classic, paths);
     }
 
     /// <summary>
@@ -71,45 +77,67 @@ public sealed class SolutionFile
     public IReadOnlyList<string> NanoProjects() =>
         ProjectPaths.Where(p => p.EndsWith(".nfproj", StringComparison.OrdinalIgnoreCase)).ToList();
 
-    // Classic .sln: scan project-declaration lines, resolve each quoted relative
-    // path against the solution directory. Skip solution folders (the path has no
-    // directory separator AND no recognised project extension — e.g. "src").
-    private static List<string> ParseClassic(string text, string slnDir)
+    // ---- Library bridge ------------------------------------------------------
+
+    /// <summary>
+    /// Reads a solution into the library's <see cref="SolutionModel"/>, picking the
+    /// serializer by extension. For <c>.slnx</c> the bare-<c>.nfproj</c> compatibility
+    /// shim is applied so a solution that references a flavored project without an
+    /// explicit <c>Type</c> attribute still parses (the serializer does not know the
+    /// <c>.nfproj</c> extension on its own).
+    /// </summary>
+    internal static SolutionModel LoadModel(string fullPath, bool isXml) =>
+        isXml ? LoadSlnxModel(File.ReadAllText(fullPath)) : OpenFromText(isXml: false, File.ReadAllText(fullPath));
+
+    // Classic .sln: the serializer carries the project-type GUID per entry, so no shim
+    // is needed. .slnx: try a straight parse; if the serializer rejects an unknown
+    // .nfproj project type, inject the nanoFramework Type attribute on bare .nfproj
+    // <Project> elements and retry. This is the only place we touch the raw text, and
+    // only to make an otherwise-unparseable solution ingestible by the library.
+    internal static SolutionModel LoadSlnxModel(string text)
     {
-        var result = new List<string>();
-        foreach (var raw in text.Split('\n'))
+        try
         {
-            var m = ClassicProjectLine.Match(raw);
-            if (!m.Success) continue;
-            var rel = m.Groups["path"].Value.Trim();
-            if (IsSolutionFolderEntry(rel)) continue;
-            result.Add(System.IO.Path.GetFullPath(System.IO.Path.Combine(slnDir, rel)));
+            return OpenFromText(isXml: true, text);
         }
-        return result;
+        catch (SolutionException)
+        {
+            var patched = InjectNfprojTypeAttribute(text);
+            if (patched is null) throw;
+            return OpenFromText(isXml: true, patched);
+        }
     }
 
-    // A classic .sln solution-folder entry uses the folder name as its "path" — no
-    // separators and no project file extension. Real project entries always carry
-    // a project extension (the path ends with .*proj).
-    private static bool IsSolutionFolderEntry(string rel)
+    // Opens solution text into the model via the matching typed serializer (chosen by
+    // format). The library's stream-based open avoids any temp file.
+    internal static SolutionModel OpenFromText(bool isXml, string text)
     {
-        var hasSeparator = rel.Contains('\\') || rel.Contains('/');
-        var looksLikeProject = rel.EndsWith("proj", StringComparison.OrdinalIgnoreCase);
-        return !hasSeparator && !looksLikeProject;
+        using var ms = new MemoryStream(new UTF8Encoding(false).GetBytes(text));
+        return isXml
+            ? SolutionSerializers.SlnXml.OpenAsync(ms, CancellationToken.None).GetAwaiter().GetResult()
+            : SolutionSerializers.SlnFileV12.OpenAsync(ms, CancellationToken.None).GetAwaiter().GetResult();
     }
 
-    // .slnx: an XML document of nested <Folder>/<Project Path="..."> elements.
-    // We collect every <Project Path="..."> regardless of nesting depth.
-    private static List<string> ParseSlnx(string text, string slnDir)
+    // Adds Type="{nfproj GUID}" to every <Project Path="...nfproj"> element that lacks
+    // a Type attribute, so the SolutionPersistence .slnx serializer can resolve the
+    // otherwise-unknown extension. Returns null when nothing needed patching (so the
+    // original error is preserved). Preserves all other formatting via XDocument.
+    internal static string? InjectNfprojTypeAttribute(string slnxText)
     {
-        var result = new List<string>();
-        var root = XElement.Parse(text);
-        foreach (var proj in root.DescendantsAndSelf().Where(e => e.Name.LocalName == "Project"))
+        XDocument doc;
+        try { doc = XDocument.Parse(slnxText, LoadOptions.PreserveWhitespace); }
+        catch { return null; }
+
+        var changed = false;
+        foreach (var proj in doc.Descendants().Where(e => e.Name.LocalName == "Project"))
         {
-            var rel = (string?)proj.Attribute("Path");
-            if (string.IsNullOrWhiteSpace(rel)) continue;
-            result.Add(System.IO.Path.GetFullPath(System.IO.Path.Combine(slnDir, rel.Trim())));
+            var path = (string?)proj.Attribute("Path");
+            if (path is null || !path.EndsWith(".nfproj", StringComparison.OrdinalIgnoreCase)) continue;
+            var hasType = proj.Attributes().Any(a => a.Name.LocalName == "Type");
+            if (hasType) continue;
+            proj.SetAttributeValue("Type", NfprojTypeGuid);
+            changed = true;
         }
-        return result;
+        return changed ? doc.ToString(SaveOptions.DisableFormatting) : null;
     }
 }

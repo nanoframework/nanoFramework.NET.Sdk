@@ -210,6 +210,67 @@ public class SolutionTests
         Assert.Equal(afterFirst, File.ReadAllText(slnx));
     }
 
+    // ---- Round-trip via the SolutionPersistence library ----------------------
+
+    [Fact]
+    public void Roundtrip_classic_sln_retarget_then_reparse_sees_csproj()
+    {
+        using var dir = new TempDir();
+        var sln = dir.File("App.sln", ClassicSln("Foo\\Foo.nfproj"));
+        var converted = new[] { dir.Combine(Path.Combine("Foo", "Foo.nfproj")) };
+
+        // Retarget the converted project, then re-read the solution through the
+        // library: the entry now resolves to the .csproj (not the .nfproj).
+        Assert.True(SolutionRewriter.RewriteFile(SolutionFile.Load(sln), converted));
+
+        var reparsed = SolutionFile.Load(sln);
+        Assert.Contains(reparsed.ProjectPaths, p => p.EndsWith("Foo.csproj"));
+        Assert.DoesNotContain(reparsed.ProjectPaths, p => p.EndsWith("Foo.nfproj"));
+        Assert.Empty(reparsed.NanoProjects());
+    }
+
+    [Fact]
+    public void Roundtrip_slnx_retarget_then_reparse_sees_csproj()
+    {
+        using var dir = new TempDir();
+        var slnx = dir.File("App.slnx", Slnx());
+        var converted = new[]
+        {
+            dir.Combine(Path.Combine("Foo", "Foo.nfproj")),
+            dir.Combine(Path.Combine("Bar", "Bar.nfproj")),
+        };
+
+        Assert.True(SolutionRewriter.RewriteFile(SolutionFile.Load(slnx), converted));
+
+        var reparsed = SolutionFile.Load(slnx);
+        // Both converted .nfproj now resolve to .csproj; the unrelated Baz.csproj stays.
+        Assert.Contains(reparsed.ProjectPaths, p => p.EndsWith("Foo.csproj"));
+        Assert.Contains(reparsed.ProjectPaths, p => p.EndsWith("Bar.csproj"));
+        Assert.Contains(reparsed.ProjectPaths, p => p.EndsWith("Baz.csproj"));
+        Assert.Empty(reparsed.NanoProjects());
+    }
+
+    [Fact]
+    public void Slnx_with_explicit_nfproj_type_attribute_parses()
+    {
+        using var dir = new TempDir();
+        // A .slnx as Visual Studio writes it for a flavored project: the .nfproj
+        // carries the nanoFramework project-type GUID as the Type attribute.
+        var slnx = dir.File("App.slnx", $$"""
+            <Solution>
+              <Project Path="Foo/Foo.nfproj" Type="{{LegacyGuid}}" />
+              <Project Path="Bar/Bar.csproj" />
+            </Solution>
+            """);
+
+        var parsed = SolutionFile.Load(slnx);
+
+        Assert.Equal(SolutionFormat.Xml, parsed.Format);
+        Assert.Equal(2, parsed.ProjectPaths.Count);
+        Assert.Single(parsed.NanoProjects());
+        Assert.EndsWith("Foo.nfproj", parsed.NanoProjects()[0]);
+    }
+
     // ---- SolutionDiscovery ----------------------------------------------------
 
     [Fact]
