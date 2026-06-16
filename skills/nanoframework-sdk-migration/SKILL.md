@@ -48,6 +48,19 @@ in [references/contributing-compliance.md](references/contributing-compliance.md
 4. **Re-run is safe** — reentrant. A partially-converted tree converts only the remaining
    `.nfproj` and leaves existing `.csproj` untouched.
 
+## Solutions (.sln / .slnx)
+
+Migration is solution-aware and keeps solutions in sync:
+
+- **Pass a solution** (`migrate <path>.sln` or `.slnx`) to convert only the projects it references
+  and retarget the solution itself (classic `.sln`: project-type GUID + `.nfproj`→`.csproj`;
+  `.slnx`: the `Path`).
+- **Pass a directory**: if it contains solutions you are asked to pick which one(s) to migrate
+  (all / none / several); if it contains none, every `.nfproj` under it is converted (loose mode).
+- **With `--glob`**: the tool finds the matching projects, discovers the solutions that reference
+  them, and (after you confirm / select) updates only those solutions.
+- `--solution <path>` forces a single target; `--yes` (or non-interactive) selects all affected.
+
 ## What the tool does per project
 
 (Full detail in [references/migration-rules.md](references/migration-rules.md).)
