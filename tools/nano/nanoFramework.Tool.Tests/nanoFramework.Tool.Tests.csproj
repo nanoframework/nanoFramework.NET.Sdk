@@ -16,7 +16,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\nanoFramework.Tool\nanoFramework.Tool.csproj" />
+    <ProjectReference Include="..\nanoFramework.Tool\nanoFramework.Tool.csproj" />
   </ItemGroup>
 
 </Project>
