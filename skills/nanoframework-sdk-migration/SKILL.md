@@ -16,7 +16,7 @@ description: >-
 
 Convert a nanoFramework repo from the legacy flavored `.nfproj` project system onto SDK-style
 projects that compose over `nanoFramework.NET.Sdk`. The mechanical conversion is done by the
-**NanoMigrate** tool (in this repo at `tools/NanoMigrate`, surfaced as `dotnet nano migrate`). The
+**NanoMigrate** tool (in this repo at `tools/migrate`, surfaced as `dotnet nano migrate`). The
 tool is **idempotent + reentrant**: it skips already-SDK-style projects and re-running over a tree
 is a safe no-op, so a partial or repeated migration is never destructive.
 
@@ -33,7 +33,7 @@ in [references/contributing-compliance.md](references/contributing-compliance.md
 1. **Dry-run** to preview every change (writes nothing):
    ```
    dotnet nano migrate <path> --dry-run
-   # or, from this repo: dotnet run --project tools/NanoMigrate -- migrate <path> --dry-run
+   # or, from this repo: dotnet run --project tools/migrate -- migrate <path> --dry-run
    ```
    Review the preview table: the target `.csproj`, the resolved `PackageReference`s, the files
    that would be deleted, the `.sln` edits, and anything in the yellow **manual review** panel.
@@ -83,7 +83,7 @@ Entries in the yellow "manual review" panel did not resolve automatically — ty
 ## Fleet migration (many repos)
 
 ```
-dotnet run --project tools/NanoMigrate -- fleet <dir-of-clones> [--glob "..."] [--branch <name>] [--commit]
+dotnet run --project tools/migrate -- fleet <dir-of-clones> [--glob "..."] [--branch <name>] [--commit]
 ```
 
 Walks each repo, converts every matching `.nfproj`, and (with `--branch`/`--commit`) commits on a
