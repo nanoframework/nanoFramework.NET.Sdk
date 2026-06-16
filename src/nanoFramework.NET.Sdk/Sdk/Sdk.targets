@@ -175,8 +175,8 @@
 
   <!-- MetadataProcessor — resolve the task DLL from NuGet package or env var override -->
   <PropertyGroup>
-    <!-- Determine MDP task TFM based on MSBuild runtime -->
-    <_NfMdpTasksTFM Condition="'$(MSBuildRuntimeType)' == 'Core'">net6.0</_NfMdpTasksTFM>
+    <!-- Determine MDP task TFM based on MSBuild runtime. MDP 4.x ships net8.0 (Core) + net472. -->
+    <_NfMdpTasksTFM Condition="'$(MSBuildRuntimeType)' == 'Core'">net8.0</_NfMdpTasksTFM>
     <_NfMdpTasksTFM Condition="'$(_NfMdpTasksTFM)' == ''">net472</_NfMdpTasksTFM>
     <!-- Resolve MDP task directory from NuGet package using GeneratePathProperty -->
     <_NfMdpTasksDir Condition="'$(NF_MDP_MSBUILDTASK_PATH)' == '' and '$(DisableNanoFrameworkMDP)' != 'true' and '$(PkgnanoFramework_Tools_MetadataProcessor_MsBuildTask)' != ''">$(PkgnanoFramework_Tools_MetadataProcessor_MsBuildTask)\lib\$(_NfMdpTasksTFM)\</_NfMdpTasksDir>
