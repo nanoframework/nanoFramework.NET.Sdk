@@ -24,14 +24,14 @@ public sealed class ProjectConverter : IProjectConverter
         "Configuration", "Platform",
     };
 
-    // Properties carried through verbatim when present.
-    private static readonly HashSet<string> KeepProps = new(StringComparer.Ordinal)
+    // The converter emits the TFM itself (see Emit), so a source TargetFramework is not
+    // carried through. Every other non-boilerplate property is passed through verbatim
+    // (OutputType, LangVersion, Nullable, SignAssembly, IsTestProject, custom props, …) —
+    // silently dropping unknown properties was a bug (e.g. OutputType=Exe was lost, turning
+    // app projects into libraries → CS8805).
+    private static readonly HashSet<string> EmittedProps = new(StringComparer.Ordinal)
     {
-        "RootNamespace", "AssemblyName", "DocumentationFile", "DefineConstants", "LangVersion",
-        "Description", "Authors", "PackageTags", "Copyright",
-        // nanoFramework unit-test projects: these keep the migrated project a test
-        // project (the SDK does not infer them).
-        "IsTestProject", "TestProjectType", "RunSettingsFilePath",
+        "TargetFramework",
     };
 
     // Legacy <Reference Include="X"> names whose NuGet package id differs from X.
@@ -112,8 +112,9 @@ public sealed class ProjectConverter : IProjectConverter
             foreach (var el in pg.Elements())
             {
                 var tag = el.Name.LocalName;
-                if (DropProps.Contains(tag)) continue;
-                if (KeepProps.Contains(tag)) SetProp(tag, el.Value);
+                if (DropProps.Contains(tag)) continue;     // project-system boilerplate the SDK supplies
+                if (EmittedProps.Contains(tag)) continue;  // the converter emits these itself (e.g. TargetFramework)
+                SetProp(tag, el.Value);                    // pass through everything else (OutputType, LangVersion, …)
             }
 
         foreach (var ig in root.Elements().Where(e => e.Name.LocalName == "ItemGroup"))
