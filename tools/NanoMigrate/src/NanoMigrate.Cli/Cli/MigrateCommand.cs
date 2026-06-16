@@ -10,8 +10,14 @@ namespace NanoFramework.Migrate.Cli.Commands;
 internal sealed class MigrateSettings : CommandSettings
 {
     [CommandArgument(0, "<path>")]
-    [Description("A .nfproj file, or a directory under which every .nfproj is converted.")]
+    [Description("A .nfproj file, a solution (.sln/.slnx), or a directory. "
+               + "For a solution, only its referenced .nfproj are converted and the solution is retargeted. "
+               + "For a directory, discovered solutions drive the selection; with no solution found, every .nfproj under the directory is converted.")]
     public string Path { get; init; } = "";
+
+    [CommandOption("--solution <path>")]
+    [Description("Migrate only this solution (.sln or .slnx): convert just its referenced .nfproj and retarget that one solution. Overrides directory discovery.")]
+    public string? Solution { get; init; }
 
     [CommandOption("--sdk <version>")]
     [Description("Accepted for back-compat but ignored: the SDK reference is versionless (pinned via global.json msbuild-sdks).")]
@@ -34,11 +40,11 @@ internal sealed class MigrateSettings : CommandSettings
     public bool DryRun { get; init; }
 
     [CommandOption("--glob <pattern>")]
-    [Description("Only convert .nfproj whose path (relative to <path>) matches the glob. Supports *, ** and ?. Example: \"Beginner/**\".")]
+    [Description("Only convert .nfproj whose path (relative to <path>) matches the glob; the solutions referencing any matched project are updated. Supports *, ** and ?. Example: \"Beginner/**\".")]
     public string? Glob { get; init; }
 
     [CommandOption("-y|--yes")]
-    [Description("Skip the interactive \"Proceed?\" confirmation on a real run. (Non-interactive runs never prompt regardless.)")]
+    [Description("Skip interactive prompts (Proceed? / solution selection): select all affected solutions and proceed. (Non-interactive runs never prompt regardless.)")]
     public bool AssumeYes { get; init; }
 
     public override ValidationResult Validate()
@@ -68,44 +74,183 @@ internal sealed class MigrateCommand : Command<MigrateSettings>
         Header("NanoMigrate");
 
         var o = settings.ToConversionOptions();
-        var path = settings.Path;
-        var targets = ProjectScanner.ResolveProjects(path, o.Glob);
+        var plan = MigrationPlanner.Plan(settings.Path, settings.Solution, settings.Glob);
 
-        // Reentrant: a fully-converted tree has no .nfproj left. Exit cleanly (0)
-        // rather than erroring, so re-running the converter over a repo is a safe
-        // no-op.
+        // Solution-aware plans (explicit solution, directory-with-solutions, glob)
+        // are handled by their own path; loose/single plans keep the historical flow.
+        return plan.Kind switch
+        {
+            PlanKind.SingleProject or PlanKind.LooseDirectory => RunLoose(settings, o, plan),
+            _ => RunSolutionScoped(settings, o, plan),
+        };
+    }
+
+    // The historical flow: a single .nfproj or a directory with no solutions. The
+    // converter retargets any solutions it finds by walking up the tree.
+    private int RunLoose(MigrateSettings settings, ConversionOptions o, MigrationPlan plan)
+    {
+        var targets = plan.LooseProjects.ToList();
+
+        // Reentrant: a fully-converted tree has no .nfproj left. Exit cleanly (0).
         if (targets.Count == 0)
         {
             var why = o.Glob is null
-                ? $"no .nfproj found under '{Esc(path)}' (already SDK-style?)."
-                : $"no .nfproj matched glob '{Esc(o.Glob)}' under '{Esc(path)}'.";
+                ? $"no .nfproj found under '{Esc(settings.Path)}' (already SDK-style?)."
+                : $"no .nfproj matched glob '{Esc(o.Glob)}' under '{Esc(settings.Path)}'.";
             AnsiConsole.MarkupLine($"[grey]nothing to convert: {why}[/]");
             return 0;
         }
 
-        // Determine the base directory glob/relative paths are reported against.
-        var baseDir = Directory.Exists(path) ? Path.GetFullPath(path)
-                                             : Path.GetDirectoryName(Path.GetFullPath(path))!;
+        var baseDir = BaseDirFor(settings.Path);
 
         AnsiConsole.MarkupLine(o.DryRun
             ? $"[yellow]Dry run[/] — analysing [bold]{targets.Count}[/] project(s) under [blue]{Esc(baseDir)}[/]. Nothing will be written."
             : $"Found [bold]{targets.Count}[/] project(s) to convert under [blue]{Esc(baseDir)}[/].");
         AnsiConsole.WriteLine();
 
-        // Real, interactive runs confirm once before touching disk. In dry-run or
-        // when stdin is redirected (CI/automation) we proceed without prompting so
-        // nothing blocks. --yes also skips the prompt.
-        if (!o.DryRun && !settings.AssumeYes && IsInteractive()
-            && !AnsiConsole.Confirm($"Proceed with {targets.Count} conversion(s)?"))
+        if (!Confirm($"Proceed with {targets.Count} conversion(s)?", settings, o)) return AbortedExit();
+
+        var results = ProcessProjects(targets, baseDir, o);
+        return Report(results, baseDir, o, rewritten: Array.Empty<string>());
+    }
+
+    // The solution-aware flow: pick the candidate solutions (multi-select / confirm),
+    // convert their .nfproj, then retarget exactly those solutions ourselves.
+    private int RunSolutionScoped(MigrateSettings settings, ConversionOptions o, MigrationPlan plan)
+    {
+        var baseDir = BaseDirFor(settings.Path);
+
+        if (plan.Candidates.Count == 0)
         {
-            AnsiConsole.MarkupLine("[grey]aborted; nothing written.[/]");
+            AnsiConsole.MarkupLine("[grey]nothing to convert: the selected solution(s) reference no .nfproj (already SDK-style?).[/]");
             return 0;
         }
 
-        var results = ProcessProjects(targets, baseDir, o);
+        // Show what is in scope before any prompt.
+        MigrateRenderer.RenderCandidateSolutions(plan.Candidates, baseDir);
 
+        var chosen = SelectSolutions(plan, settings, o);
+        if (chosen.Count == 0)
+        {
+            AnsiConsole.MarkupLine("[grey]aborted; no solution selected, nothing written.[/]");
+            return 0;
+        }
+
+        var targets = MigrationPlan.ProjectsOf(chosen);
+        if (targets.Count == 0)
+        {
+            AnsiConsole.MarkupLine("[grey]nothing to convert: the chosen solution(s) reference no .nfproj.[/]");
+            return 0;
+        }
+
+        AnsiConsole.MarkupLine(o.DryRun
+            ? $"[yellow]Dry run[/] — analysing [bold]{targets.Count}[/] project(s) across [bold]{chosen.Count}[/] solution(s). Nothing will be written."
+            : $"Converting [bold]{targets.Count}[/] project(s) across [bold]{chosen.Count}[/] solution(s).");
+        AnsiConsole.WriteLine();
+
+        if (!Confirm($"Proceed with {targets.Count} conversion(s) and update {chosen.Count} solution(s)?", settings, o))
+            return AbortedExit();
+
+        // The host owns solution retargeting here, so the converter must not also
+        // walk up and rewrite solutions the user did not select.
+        var convOpts = o with { SkipSolutionRewrite = true };
+        var results = ProcessProjects(targets, baseDir, convOpts);
+
+        // Retarget exactly the chosen solutions to the converted projects. Only
+        // projects that actually converted (a .csproj now exists / would exist) are
+        // handed to the rewriter; idempotent on re-run.
+        var converted = results
+            .Where(r => r.Result.Status is ConvertStatus.Converted or ConvertStatus.Review)
+            .Select(r => r.Nfproj)
+            .ToList();
+
+        var rewritten = new List<string>();
+        if (!o.DryRun && converted.Count > 0)
+        {
+            foreach (var c in chosen)
+                if (SolutionRewriter.RewriteFile(c.Solution, converted))
+                    rewritten.Add(c.Solution.Path);
+        }
+
+        return Report(results, baseDir, o, rewritten);
+    }
+
+    // Decides which candidate solutions to operate on. Explicit single solution: no
+    // choice. Otherwise multi-select when interactive; non-interactive / --yes
+    // selects all affected (announcing it).
+    private static List<SolutionCandidate> SelectSolutions(MigrationPlan plan, MigrateSettings settings, ConversionOptions o)
+    {
+        // An explicit single solution (positional .sln/.slnx or --solution) is the
+        // only candidate; there is nothing to choose.
+        if (!plan.RequiresSelection)
+            return plan.Candidates.ToList();
+
+        var all = plan.Candidates.ToList();
+
+        // Only one affected solution: a simple confirm, not a multi-select.
+        if (all.Count == 1)
+        {
+            if (settings.AssumeYes || o.DryRun || !IsInteractive())
+            {
+                if (!settings.AssumeYes && !o.DryRun)
+                    AnsiConsole.MarkupLine("[grey]non-interactive: selecting the only affected solution.[/]");
+                return all;
+            }
+            var fmt = all[0].Solution.Format == SolutionFormat.Xml ? "slnx" : "sln";
+            return AnsiConsole.Confirm($"Migrate solution '{Esc(Path.GetFileName(all[0].Solution.Path))}' ({fmt})?")
+                ? all : new List<SolutionCandidate>();
+        }
+
+        // Several solutions: CI / non-interactive selects all and proceeds.
+        if (settings.AssumeYes || o.DryRun || !IsInteractive())
+        {
+            if (!settings.AssumeYes && !o.DryRun)
+                AnsiConsole.MarkupLine($"[grey]non-interactive: selecting all {all.Count} affected solution(s).[/]");
+            return all;
+        }
+
+        // Interactive: present the multi-select. Picking none aborts cleanly.
+        var prompt = new MultiSelectionPrompt<SolutionCandidate>()
+            .Title("Select the solution(s) to migrate")
+            .NotRequired()                       // picking none is allowed (aborts)
+            .PageSize(15)
+            .InstructionsText("[grey](space to toggle, enter to confirm; pick none to abort)[/]")
+            .UseConverter(c =>
+            {
+                var fmt = c.Solution.Format == SolutionFormat.Xml ? "slnx" : "sln";
+                return $"{Path.GetFileName(c.Solution.Path)} ({fmt}, {c.NanoProjects.Count} project(s))";
+            });
+        prompt.AddChoices(all);
+        return AnsiConsole.Prompt(prompt);
+    }
+
+    // The shared confirm gate. Returns true when we should proceed. In dry-run, when
+    // --yes is set, or in a non-interactive context we never block.
+    private static bool Confirm(string question, MigrateSettings settings, ConversionOptions o)
+    {
+        if (o.DryRun || settings.AssumeYes || !IsInteractive()) return true;
+        return AnsiConsole.Confirm(question);
+    }
+
+    private static int AbortedExit()
+    {
+        AnsiConsole.MarkupLine("[grey]aborted; nothing written.[/]");
+        return 0;
+    }
+
+    // The base directory glob/relative paths are reported against.
+    private static string BaseDirFor(string path) =>
+        Directory.Exists(path) ? Path.GetFullPath(path)
+        : File.Exists(path)    ? Path.GetDirectoryName(Path.GetFullPath(path))!
+                               : Path.GetFullPath(path);
+
+    // Renders the summary/review/tally and (for solution-scoped runs) the rewritten
+    // solutions, then maps the outcome to the exit code (0 clean / 2 review / 1 error).
+    private static int Report(List<ProjectOutcome> results, string baseDir, ConversionOptions o, IReadOnlyList<string> rewritten)
+    {
         MigrateRenderer.RenderSummaryTable(results, baseDir, o.DryRun);
         MigrateRenderer.RenderReviewNotes(results, baseDir);
+        MigrateRenderer.RenderRewrittenSolutions(rewritten, baseDir);
         MigrateRenderer.RenderTally(results, o.DryRun);
 
         var errors = results.Count(r => r.Result.Status == ConvertStatus.Error);

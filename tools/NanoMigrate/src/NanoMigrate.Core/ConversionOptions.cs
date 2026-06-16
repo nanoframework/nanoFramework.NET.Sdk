@@ -35,4 +35,14 @@ public sealed record ConversionOptions
     /// Supports <c>*</c>, <c>**</c> and <c>?</c>.
     /// </summary>
     public string? Glob { get; init; }
+
+    /// <summary>
+    /// Suppress the converter's built-in solution retargeting (its walk-up
+    /// discovery + rewrite). Set when the host drives a <em>solution-scoped</em>
+    /// migration and rewrites the chosen solutions itself via
+    /// <see cref="SolutionRewriter"/>, so the converter never touches a solution the
+    /// user did not select. The <see cref="ConvertResult.UpdatedSolutions"/> preview
+    /// list is still populated. Default false preserves the historical behavior.
+    /// </summary>
+    public bool SkipSolutionRewrite { get; init; }
 }

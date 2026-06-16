@@ -106,6 +106,44 @@ internal static class MigrateRenderer
           + $"[yellow]flagged {flagged}[/]  •  [red]errors {errors}[/]  •  total {results.Count}");
     }
 
+    // A tree of the candidate solutions and the .nfproj each would convert, so the
+    // user sees what is in scope before any prompt. Used for solution-input,
+    // directory-with-solutions, and glob-scoped plans.
+    public static void RenderCandidateSolutions(IReadOnlyList<SolutionCandidate> candidates, string baseDir)
+    {
+        if (candidates.Count == 0) return;
+
+        var tree = new Tree("[bold]Affected solution(s)[/]");
+        foreach (var c in candidates)
+        {
+            var fmt = c.Solution.Format == SolutionFormat.Xml ? "slnx" : "sln";
+            var slnRel = RelOrName(baseDir, c.Solution.Path);
+            var node = tree.AddNode($"[yellow]{Esc(slnRel)}[/] [grey]({fmt}, {c.NanoProjects.Count} project(s))[/]");
+            foreach (var nf in c.NanoProjects)
+                node.AddNode($"[blue]{Esc(RelOrName(baseDir, nf))}[/]");
+        }
+        AnsiConsole.Write(tree);
+        AnsiConsole.WriteLine();
+    }
+
+    // The solutions actually retargeted by a real run (grouped notice). Pure
+    // presentation over the rewrite results.
+    public static void RenderRewrittenSolutions(IReadOnlyList<string> rewritten, string baseDir)
+    {
+        if (rewritten.Count == 0) return;
+        AnsiConsole.WriteLine();
+        foreach (var sln in rewritten)
+            AnsiConsole.MarkupLine($"[yellow]updated[/] {Esc(RelOrName(baseDir, sln))}");
+    }
+
+    // A path relative to baseDir when it sits underneath it; otherwise the bare
+    // file name. Keeps output readable whether or not the file is inside the tree.
+    private static string RelOrName(string baseDir, string path)
+    {
+        var rel = Path.GetRelativePath(baseDir, path);
+        return rel.StartsWith("..", StringComparison.Ordinal) ? Path.GetFileName(path) : rel;
+    }
+
     private static (string label, string color) StatusLabel(ConvertStatus s) => s switch
     {
         ConvertStatus.Converted => ("Converted", "green"),

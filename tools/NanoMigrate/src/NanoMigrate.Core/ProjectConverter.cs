@@ -168,6 +168,9 @@ public sealed class ProjectConverter : IProjectConverter
         var pc = Path.Combine(projDir, "packages.config");
         if (File.Exists(pc)) result.DeletedFiles.Add(Path.GetFullPath(pc));
         foreach (var ai in ExistingAssemblyInfo(projDir)) result.DeletedFiles.Add(ai);
+        // The .sln/.slnx that still reference the .nfproj are what a rewrite would
+        // touch. We always populate this preview list (even when SkipSolutionRewrite
+        // is set, so the host can render it); the actual rewrite below is gated.
         if (replacingNfproj)
             foreach (var sln in SolutionsReferencing(projDir, nfFull)) result.UpdatedSolutions.Add(sln);
 
@@ -181,8 +184,9 @@ public sealed class ProjectConverter : IProjectConverter
             if (replacingNfproj)
             {
                 File.Delete(nfproj);
-                // Point any .sln entries at the new .csproj (idempotent).
-                UpdateSolutions(projDir, nfproj, outPath);
+                // Point any .sln/.slnx entries at the new .csproj (idempotent),
+                // unless the host is driving solution rewriting itself.
+                if (!o.SkipSolutionRewrite) UpdateSolutions(projDir, nfFull);
             }
             if (File.Exists(pc)) File.Delete(pc);
             // The SDK default **/*.cs glob plus generated assembly info would
@@ -206,17 +210,19 @@ public sealed class ProjectConverter : IProjectConverter
         }
     }
 
-    // The .sln files that currently still reference the .nfproj (i.e. those
-    // UpdateSolutions would rewrite). Used to preview .sln edits in dry-run.
+    // The .sln/.slnx files that currently still reference the .nfproj (i.e. those
+    // UpdateSolutions would rewrite). Used to preview solution edits in dry-run.
+    // Resolves entries through the SolutionFile parser so both classic and XML
+    // solutions are considered and only genuine references count.
     private static IEnumerable<string> SolutionsReferencing(string projDir, string nfproj)
     {
-        var nfName = Path.GetFileName(nfproj);
+        var target = Path.GetFullPath(nfproj);
         foreach (var sln in FindSolutionFiles(projDir))
         {
-            string text;
-            try { text = File.ReadAllText(sln); }
+            SolutionFile parsed;
+            try { parsed = SolutionFile.Load(sln); }
             catch { continue; }
-            if (text.Contains(nfName, StringComparison.OrdinalIgnoreCase))
+            if (parsed.ProjectPaths.Any(p => string.Equals(Path.GetFullPath(p), target, StringComparison.OrdinalIgnoreCase)))
                 yield return sln;
         }
     }
@@ -277,78 +283,21 @@ public sealed class ProjectConverter : IProjectConverter
         }
     }
 
-    // Project-type GUIDs: legacy nanoFramework flavor -> SDK-style C#.
-    private const string NfprojTypeGuid = "{11A8DD76-328B-46DF-9F39-F559912D0360}";
-    private const string CsprojTypeGuid = "{9A19103F-16F7-4668-BE54-9A1E7A4F7556}";
-
-    // Rewrites .sln entries that reference the converted .nfproj so they point at
-    // the new .csproj and use the SDK-style project-type GUID. Searches walking up
-    // from the project directory to the repo root (the dir containing .git), plus
-    // any .sln in the project's own directory tree. Only entries still pointing at
-    // the .nfproj are touched, so re-running is a no-op.
-    private static void UpdateSolutions(string projDir, string nfproj, string csproj)
+    // Rewrites .sln/.slnx entries that reference the converted .nfproj so they point
+    // at the new .csproj (classic .sln also swaps the project-type GUID). Searches
+    // walking up from the project directory to the repo root (the dir containing
+    // .git), plus any solution in the project's own directory tree. The actual
+    // retarget is delegated to SolutionRewriter, which is line/path-scoped and
+    // idempotent, so re-running is a no-op.
+    private static void UpdateSolutions(string projDir, string nfproj)
     {
-        var slns = FindSolutionFiles(projDir);
-        if (slns.Count == 0) return;
-
-        var nfName = Path.GetFileName(nfproj);                 // e.g. Foo.nfproj
-        var csName = Path.GetFileName(csproj);                 // e.g. Foo.csproj
-
-        foreach (var sln in slns)
+        var converted = new[] { Path.GetFullPath(nfproj) };
+        foreach (var sln in FindSolutionFiles(projDir))
         {
-            string text;
-            try { text = File.ReadAllText(sln); }
+            SolutionFile parsed;
+            try { parsed = SolutionFile.Load(sln); }
             catch { continue; }
-            var slnDir = Path.GetDirectoryName(Path.GetFullPath(sln))!;
-
-            // The path stored in the .sln is relative to the .sln directory and is
-            // wrapped in double quotes. Match the *quoted* path so we rewrite the
-            // specific project entry rather than blanket-replacing a substring that
-            // might collide with another project's name.
-            var relPath = Path.GetRelativePath(slnDir, nfproj);
-            var candidates = new[]
-            {
-                relPath,                              // OS-native separators
-                relPath.Replace('/', '\\'),
-                relPath.Replace('\\', '/'),
-                nfName,                               // fallback: bare filename in the sln dir
-            };
-
-            // Rewrite line-by-line so the GUID swap stays scoped to *this*
-            // project's entry. A blanket GUID replace would wrongly flip other,
-            // still-unconverted nanoFramework projects in a shared solution.
-            var lines = text.Split('\n');
-            var changed = false;
-            for (int li = 0; li < lines.Length; li++)
-            {
-                var line = lines[li];
-                // Only the project's declaration line names its path.
-                if (!line.TrimStart().StartsWith("Project(", StringComparison.OrdinalIgnoreCase)) continue;
-
-                var matched = false;
-                foreach (var path in candidates.Distinct(StringComparer.OrdinalIgnoreCase))
-                {
-                    var quoted = "\"" + path + "\"";
-                    if (!line.Contains(quoted, StringComparison.OrdinalIgnoreCase)) continue;
-                    var quotedReplacement = "\"" + path[..^nfName.Length] + csName + "\"";
-                    line = ReplaceIgnoreCase(line, quoted, quotedReplacement);
-                    matched = true;
-                }
-                if (!matched) continue;
-
-                // Swap the legacy project-type GUID for the SDK-style one, but only
-                // on the line we just retargeted.
-                if (line.Contains(NfprojTypeGuid, StringComparison.OrdinalIgnoreCase))
-                    line = ReplaceIgnoreCase(line, NfprojTypeGuid, CsprojTypeGuid);
-
-                lines[li] = line;
-                changed = true;
-            }
-            if (!changed) continue;
-
-            var updated = string.Join('\n', lines);
-            if (!string.Equals(updated, text, StringComparison.Ordinal))
-                File.WriteAllText(sln, updated, new UTF8Encoding(false));
+            SolutionRewriter.RewriteFile(parsed, converted);
         }
     }
 
@@ -356,38 +305,29 @@ public sealed class ProjectConverter : IProjectConverter
     {
         var found = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
+        void AddSolutionsIn(string d, SearchOption option)
+        {
+            foreach (var pattern in new[] { "*.sln", "*.slnx" })
+                foreach (var sln in Directory.EnumerateFiles(d, pattern, option))
+                    found.Add(Path.GetFullPath(sln));
+        }
+
         // Walk up to the repo root (the directory containing .git), collecting
-        // .sln files at each level.
+        // solution files at each level.
         var dir = new DirectoryInfo(Path.GetFullPath(projDir));
         while (dir is not null)
         {
-            foreach (var sln in Directory.EnumerateFiles(dir.FullName, "*.sln", SearchOption.TopDirectoryOnly))
-                found.Add(Path.GetFullPath(sln));
+            AddSolutionsIn(dir.FullName, SearchOption.TopDirectoryOnly);
             if (Directory.Exists(Path.Combine(dir.FullName, ".git"))
                 || File.Exists(Path.Combine(dir.FullName, ".git")))
                 break; // reached the repo root
             dir = dir.Parent;
         }
 
-        // Also any .sln anywhere in the project's own directory tree.
-        foreach (var sln in Directory.EnumerateFiles(projDir, "*.sln", SearchOption.AllDirectories))
-            found.Add(Path.GetFullPath(sln));
+        // Also any solution anywhere in the project's own directory tree.
+        AddSolutionsIn(projDir, SearchOption.AllDirectories);
 
         return found.ToList();
-    }
-
-    private static string ReplaceIgnoreCase(string input, string search, string replacement)
-    {
-        var sb = new StringBuilder();
-        int i = 0;
-        while (i < input.Length)
-        {
-            var idx = input.IndexOf(search, i, StringComparison.OrdinalIgnoreCase);
-            if (idx < 0) { sb.Append(input, i, input.Length - i); break; }
-            sb.Append(input, i, idx - i).Append(replacement);
-            i = idx + search.Length;
-        }
-        return sb.ToString();
     }
 
     private static bool IsDefaultCompile(string inc)
