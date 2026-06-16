@@ -47,9 +47,24 @@ Or pin the SDK version in `global.json`:
 
 ```
 src/
-  nanoFramework.Sdk/           SDK NuGet package (Sdk.props / Sdk.targets)
+  nanoFramework.NET.Sdk/           SDK NuGet package (Sdk.props / Sdk.targets)
   nanoFramework.Tools.BuildTasks/  Custom MSBuild tasks (resource gen, binary output, etc.)
+tools/
+  nano/                            dotnet nano — the umbrella CLI (see tools/nano/README.md)
+  migrate/                         NanoMigrate — .nfproj -> SDK-style converter (see tools/migrate/README.md)
 ```
+
+## Tools
+
+The repo ships two CLIs alongside the SDK:
+
+- **[`dotnet nano`](tools/nano/README.md)** (`nanoFramework.Tool`) — the umbrella CLI: built-in
+  managed commands (`migrate`, `clean`, `rollback`) plus wrapped external tools (`flash` → `nanoff`).
+- **[`nano-migrate`](tools/migrate/README.md)** (`nanoFramework.Migrate`) — the standalone migration
+  tool that converts legacy `.nfproj` projects to SDK-style, single-repo or across an entire fleet.
+
+The companion installable **[migration skill](skills/nanoframework-sdk-migration)** drives the
+converter with the full rule set and contribution/PR conventions.
 
 ## Development
 

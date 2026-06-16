@@ -20,6 +20,16 @@ projects that compose over `nanoFramework.NET.Sdk`. The mechanical conversion is
 tool is **idempotent + reentrant**: it skips already-SDK-style projects and re-running over a tree
 is a safe no-op, so a partial or repeated migration is never destructive.
 
+The full, as-built command/option reference is [`tools/migrate/README.md`](../../tools/migrate/README.md)
+(and [`tools/nano/README.md`](../../tools/nano/README.md) for the umbrella). It is the source of
+truth; this skill is the workflow guide. **Always confirm the live surface with `--help`** — it
+matches the installed version exactly:
+
+```
+dotnet nano --help               # every command
+dotnet nano migrate --help       # options for one command
+```
+
 ## Scope — read this first
 
 Project-system migration **only**. Do not add, and do not ask the tool to touch: OTA update
@@ -28,12 +38,29 @@ exact per-project transformation rules are in
 [references/migration-rules.md](references/migration-rules.md); contribution + PR conventions are
 in [references/contributing-compliance.md](references/contributing-compliance.md).
 
+## Commands at a glance
+
+Run any of these as `dotnet nano <command>` (umbrella) or `nano-migrate <command>` (standalone) —
+or from source with `dotnet run --project tools/migrate/src/NanoMigrate.Cli -- <command>`.
+
+| Command | What it does |
+|---|---|
+| `migrate <path>` | Convert a `.nfproj`, a solution (`.sln`/`.slnx`), or every `.nfproj` under a directory. |
+| `clean [path]` | Remove migration leftovers: `*.nfproj.bak` files and `.nanomigrate/` rollback folders. |
+| `rollback [path]` | Revert the last recorded migration (restore originals, delete created projects). |
+| `clone [out-dir]` | Clone all matching repos from a GitHub org (fleet prep). *Standalone CLI only.* |
+| `fleet <repos-dir>` | Migrate every `.nfproj` across cloned repos; write a report; optionally branch + commit. *Standalone CLI only.* |
+
+Key `migrate` options (see `migrate --help` / the README for the rest): `--dry-run`, `--glob <p>`,
+`--solution <p>`, `--ext .csproj|.nfproj`, `--no-backup`, `--report <file.md|.html>`,
+`--verify`/`--no-verify`, `-y|--yes`.
+
 ## Always test a directory first, then migrate for real
 
 1. **Dry-run** to preview every change (writes nothing):
    ```
    dotnet nano migrate <path> --dry-run
-   # or, from this repo: dotnet run --project tools/migrate -- migrate <path> --dry-run
+   # or, from this repo: dotnet run --project tools/migrate/src/NanoMigrate.Cli -- migrate <path> --dry-run
    ```
    Review the preview table: the target `.csproj`, the resolved `PackageReference`s, the files
    that would be deleted, the `.sln` edits, and anything in the yellow **manual review** panel.
@@ -47,6 +74,12 @@ in [references/contributing-compliance.md](references/contributing-compliance.md
    ```
 4. **Re-run is safe** — reentrant. A partially-converted tree converts only the remaining
    `.nfproj` and leaves existing `.csproj` untouched.
+
+A real run **verifies by default**: after converting, it builds the affected solution(s)/project(s)
+and, on a failed build, offers to roll the whole run back (interactive) or tells you to run
+`rollback` later (non-interactive). Use `--no-verify` to skip it. Add `--report <file>` to emit a
+record of what changed — `.md`/`.markdown` → Markdown, `.html`/`.htm` → HTML — which also works
+under `--dry-run` (it reports what *would* change).
 
 ## Solutions (.sln / .slnx)
 
@@ -80,13 +113,36 @@ Entries in the yellow "manual review" panel did not resolve automatically — ty
 `<Reference>` with no HintPath and no matching `packages.config` entry. Add the right
 `PackageReference` by hand, then re-run (a no-op for everything already converted).
 
+## Back up, roll back, clean up
+
+- Each real conversion writes a `.nfproj.bak` next to the project (suppress with `--no-backup`).
+- Independently, a real run records a **self-contained rollback journal** under `.nanomigrate/`.
+  `rollback [path]` reverts the last recorded migration (restore originals, delete created files);
+  it's idempotent — no journal means "nothing to roll back", exit 0.
+- When you're satisfied with a migration, `clean [path]` removes the leftovers — every
+  `*.nfproj.bak` and every `.nanomigrate/` folder — so you don't commit a pile of backups. Both
+  preview before deleting; add `-y|--yes` to skip the prompt.
+
 ## Fleet migration (many repos)
 
+Two steps — `clone` to fetch the repos, `fleet` to migrate them (`clone`/`fleet` are in the
+standalone `nano-migrate` CLI). From source:
+
 ```
-dotnet run --project tools/migrate -- fleet <dir-of-clones> [--glob "..."] [--branch <name>] [--commit]
+# 1) clone a GitHub org's matching repos (default org nanoframework, filter lib-)
+dotnet run --project tools/migrate/src/NanoMigrate.Cli -- clone ./nano-repos --token $GITHUB_TOKEN
+
+# 2) dry-run the whole fleet and read the report before changing anything
+dotnet run --project tools/migrate/src/NanoMigrate.Cli -- fleet ./nano-repos --dry-run --report fleet-report.md
+
+# 3) apply on a branch and commit, so each repo ends up ready to PR
+dotnet run --project tools/migrate/src/NanoMigrate.Cli -- fleet ./nano-repos \
+  --branch sdk-migration --commit --issue <home-issue> --report fleet-report.md
 ```
 
-Walks each repo, converts every matching `.nfproj`, and (with `--branch`/`--commit`) commits on a
-branch. Open PRs from the nanoFramework org template — see
+`fleet` walks each repo, converts every matching `.nfproj`, writes the report, and (with
+`--branch`/`--commit`) commits a contribution-compliant, signed-off message; `--commit` implies
+`--no-backup`. It stops at the commit — it never pushes or opens PRs. Open PRs from the
+nanoFramework org template — see
 [references/contributing-compliance.md](references/contributing-compliance.md). Convert leaf-first
 (dependencies before dependents); branch names must not start with `develop`; never target `main`.
