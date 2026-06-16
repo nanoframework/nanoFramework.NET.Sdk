@@ -15,10 +15,13 @@
   -->
 
   <!-- ============================================================ -->
-  <!--  Append NETNANO1_0 define constant                     -->
+  <!--  Compilation define constants                                 -->
+  <!--  NETNANO1_0 is the SDK-style symbol; NANOFRAMEWORK_1_0 is the  -->
+  <!--  legacy NFProjectSystem symbol, kept for source compatibility  -->
+  <!--  so existing `#if NANOFRAMEWORK_1_0` code still compiles.       -->
   <!-- ============================================================ -->
   <PropertyGroup>
-    <DefineConstants>$(DefineConstants);NETNANO1_0</DefineConstants>
+    <DefineConstants>$(DefineConstants);NETNANO1_0;NANOFRAMEWORK_1_0</DefineConstants>
   </PropertyGroup>
 
   <!-- ============================================================ -->
