@@ -91,6 +91,16 @@ public sealed class ProjectConverter : IProjectConverter
         var projRefs = new List<string>();
         var keepItems = new List<XElement>();
         var review = new List<string>();
+        // Normalized relative paths of .cs files the legacy project explicitly
+        // compiled and that the SDK would also glob by default. Used to detect a
+        // legacy project that compiled only a SUBSET of the .cs files on disk: the
+        // unlisted ones must be excluded via <Compile Remove>, else the SDK's
+        // **/*.cs glob compiles files the project never built (duplicate types).
+        var explicitCompile = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        // Top-level <Import> projects to carry through verbatim — notably a Shared
+        // Project (.projitems) import, whose source files the SDK would otherwise
+        // never see (dropping it leaves the consuming project missing those types).
+        var imports = new List<string>();
 
         // Seed package references straight from packages.config when it is the
         // authoritative source. Drop the legacy <Reference> elements entirely in
@@ -116,6 +126,23 @@ public sealed class ProjectConverter : IProjectConverter
                 if (EmittedProps.Contains(tag)) continue;  // the converter emits these itself (e.g. TargetFramework)
                 SetProp(tag, el.Value);                    // pass through everything else (OutputType, LangVersion, …)
             }
+
+        // Top-level <Import> elements. The NFProjectSystem.* props/targets imports are
+        // SDK-supplied boilerplate and are dropped. A Shared Project (.projitems) import
+        // carries real source into the project and MUST be preserved, else its types go
+        // missing (CS0246). Anything else unrecognized is surfaced for review.
+        foreach (var imp in root.Elements().Where(e => e.Name.LocalName == "Import"))
+        {
+            var project = (string?)imp.Attribute("Project") ?? "";
+            if (project.Contains("NFProjectSystem", StringComparison.OrdinalIgnoreCase)) continue;
+            if (project.EndsWith(".projitems", StringComparison.OrdinalIgnoreCase))
+            {
+                imports.Add(project);
+                continue;
+            }
+            if (!string.IsNullOrWhiteSpace(project))
+                review.Add($"Unhandled <Import Project='{project}'> (carry it over manually if needed)");
+        }
 
         foreach (var ig in root.Elements().Where(e => e.Name.LocalName == "ItemGroup"))
             foreach (var el in ig.Elements())
@@ -167,16 +194,25 @@ public sealed class ProjectConverter : IProjectConverter
                         projRefs.Add(inc);
                         break;
                     case "Compile":
-                        if (!IsDefaultCompile(inc) || el.Attribute("Link") is not null)
+                        // Explicit Compile of a hand-written AssemblyInfo / default-globbed
+                        // .cs is dropped (the SDK globs **/*.cs). Keep only non-default
+                        // paths or links the SDK would NOT glob. (Files on disk that the
+                        // legacy project deliberately did NOT compile are excluded via a
+                        // Compile Remove computed after the loop — see explicitCompile.)
+                        if (el.Attribute("Link") is not null || !IsDefaultCompile(inc))
                             keepItems.Add(el);
+                        else
+                            explicitCompile.Add(NormalizeRel(inc));
                         break;
                     case "None":
-                        if (inc != "packages.config" && !inc.EndsWith(".nuspec", StringComparison.OrdinalIgnoreCase))
-                            keepItems.Add(el);
+                        // packages.config and the .nuspec are folded away, never carried.
+                        if (inc == "packages.config" || inc.EndsWith(".nuspec", StringComparison.OrdinalIgnoreCase))
+                            break;
+                        KeepOrUpdateDefaultGlobItem(el, keepItems);
                         break;
                     case "EmbeddedResource":
                     case "Content":
-                        keepItems.Add(el);
+                        KeepOrUpdateDefaultGlobItem(el, keepItems);
                         break;
                     case "ProjectCapability":
                         // nanoFramework test projects mark themselves with
@@ -192,7 +228,30 @@ public sealed class ProjectConverter : IProjectConverter
 
         FoldNuspec(projDir, SetProp);
 
-        var xml = Emit(props, pkgRefs, projRefs, keepItems, o, cpmActive);
+        // A hand-written AssemblyInfo.cs that carries nanoFramework-specific
+        // attributes the SDK's GenerateAssemblyInfo does NOT emit (notably
+        // AssemblyNativeVersion, required by the MetadataProcessor when generating
+        // interop/skeleton stubs) must be KEPT rather than deleted. In that case we
+        // turn GenerateAssemblyInfo off so the hand-written file is authoritative
+        // and the standard attributes it also declares don't collide with generated
+        // ones. Otherwise the file is deleted as before (it would duplicate the
+        // SDK-generated assembly attributes).
+        var keepAssemblyInfo = HasNanoAssemblyInfo(projDir);
+        if (keepAssemblyInfo) SetProp("GenerateAssemblyInfo", "false");
+
+        // Compile-subset exclusion: when the legacy project explicitly compiled a
+        // strict subset of the .cs files present on disk, the unlisted files must be
+        // removed from the SDK's default **/*.cs glob. Without this the SDK compiles
+        // source the project never built (e.g. an alternate/draft copy of a class),
+        // producing duplicate-definition errors. Only meaningful when the project
+        // had explicit Compile items in the first place.
+        var compileRemoves = new List<string>();
+        if (explicitCompile.Count > 0)
+            foreach (var rel in OnDiskDefaultCompile(projDir))
+                if (!explicitCompile.Contains(rel))
+                    compileRemoves.Add(rel);
+
+        var xml = Emit(props, pkgRefs, projRefs, keepItems, compileRemoves, imports, o, cpmActive);
 
         var outPath = Path.ChangeExtension(Path.GetFullPath(nfproj), o.Ext);
         var nfFull = Path.GetFullPath(nfproj);
@@ -225,7 +284,8 @@ public sealed class ProjectConverter : IProjectConverter
         if (replacingNfproj) result.DeletedFiles.Add(nfFull);
         var pc = Path.Combine(projDir, "packages.config");
         if (File.Exists(pc)) result.DeletedFiles.Add(Path.GetFullPath(pc));
-        foreach (var ai in ExistingAssemblyInfo(projDir)) result.DeletedFiles.Add(ai);
+        if (!keepAssemblyInfo)
+            foreach (var ai in ExistingAssemblyInfo(projDir)) result.DeletedFiles.Add(ai);
         // The .sln/.slnx that still reference the .nfproj are what a rewrite would
         // touch. We always populate this preview list (even when SkipSolutionRewrite
         // is set, so the host can render it); the actual rewrite below is gated.
@@ -254,8 +314,11 @@ public sealed class ProjectConverter : IProjectConverter
             // The SDK default **/*.cs glob plus generated assembly info would
             // otherwise produce duplicate-attribute build errors, so delete a
             // hand-written AssemblyInfo.cs from disk (dropping the Compile item
-            // is not enough).
-            DeleteAssemblyInfo(projDir);
+            // is not enough). EXCEPTION: an AssemblyInfo.cs that carries
+            // nanoFramework-specific attributes the SDK never generates is kept
+            // (with GenerateAssemblyInfo=false set above) so those attributes
+            // survive — deleting it would break MetadataProcessor stub generation.
+            if (!keepAssemblyInfo) DeleteAssemblyInfo(projDir);
         }
 
         return result;
@@ -517,12 +580,117 @@ public sealed class ProjectConverter : IProjectConverter
 
     private static bool IsDefaultCompile(string inc)
     {
-        var baseName = inc.TrimStart('.', '\\');
         if (!inc.EndsWith(".cs", StringComparison.OrdinalIgnoreCase)) return false;
+        var baseName = inc.TrimStart('.', '\\', '/');
         // A hand-written AssemblyInfo.cs collides with GenerateAssemblyInfo → drop it.
         if (baseName.Replace('\\', '/').EndsWith("Properties/AssemblyInfo.cs", StringComparison.OrdinalIgnoreCase))
             return true;
-        return !baseName.Contains('\\');
+        // The SDK globs **/*.cs recursively, so any relative under-project path is a
+        // default-globbed compile item (not just files in the project root).
+        return IsDefaultGlobPath(inc);
+    }
+
+    // A path is "default-globbed" — i.e. the SDK's implicit **/* globs would already
+    // pick it up — when it is relative, rooted under the project directory, and does
+    // not escape it via "..". Such items must NOT be re-Included explicitly (that
+    // duplicates the globbed item); rooted/external paths and links are NOT globbed
+    // and so are kept verbatim.
+    private static bool IsDefaultGlobPath(string inc)
+    {
+        if (string.IsNullOrWhiteSpace(inc)) return false;
+        var norm = inc.Replace('\\', '/').Trim();
+        if (norm.StartsWith("../") || norm == "..") return false;          // escapes project dir
+        if (norm.StartsWith('/')) return false;                            // rooted (unix)
+        if (norm.Length >= 2 && norm[1] == ':') return false;              // rooted (drive letter)
+        if (norm.Contains("/../")) return false;                          // climbs out partway
+        if (norm.Contains('*') || norm.Contains('?')) return false;        // already a glob
+        return true;
+    }
+
+    // Decides how a default-globbable item (None / EmbeddedResource / Content) should
+    // be carried into the SDK project, per the rules:
+    //   - external/rooted path or a Link present  → keep as Include (SDK won't glob it);
+    //   - default-globbed path WITH metadata       → rewrite Include→Update so the
+    //       metadata attaches to the SDK's already-globbed item (no duplicate);
+    //   - default-globbed path WITHOUT metadata    → drop entirely (SDK globs it plain).
+    private static void KeepOrUpdateDefaultGlobItem(XElement el, List<XElement> keepItems)
+    {
+        var inc = (string?)el.Attribute("Include") ?? "";
+        var hasLink = el.Attribute("Link") is not null
+                   || el.Elements().Any(e => e.Name.LocalName == "Link");
+
+        if (hasLink || !IsDefaultGlobPath(inc))
+        {
+            keepItems.Add(el);            // SDK won't glob this — keep the explicit Include
+            return;
+        }
+
+        var hasMetadata = el.Elements().Any() || el.Attributes().Any(a => a.Name.LocalName != "Include");
+        if (!hasMetadata)
+            return;                       // SDK globs it plainly — drop the redundant item
+
+        // Rewrite Include → Update so the metadata lands on the globbed item without
+        // re-including (which would trip NETSDK1022 for EmbeddedResource/Content).
+        el.Attribute("Include")!.Remove();
+        el.SetAttributeValue("Update", inc);
+        keepItems.Add(el);
+    }
+
+    // Normalizes a project-relative path for comparison against on-disk enumeration:
+    // forward slashes, leading "./" stripped, no surrounding whitespace.
+    private static string NormalizeRel(string inc)
+    {
+        var s = inc.Replace('\\', '/').Trim();
+        while (s.StartsWith("./")) s = s[2..];
+        return s;
+    }
+
+    // True when a hand-written AssemblyInfo.cs on disk declares an attribute the SDK's
+    // GenerateAssemblyInfo does not emit (AssemblyNativeVersion). Such a file must be
+    // kept (with GenerateAssemblyInfo disabled) rather than deleted.
+    private static bool HasNanoAssemblyInfo(string projDir)
+    {
+        foreach (var rel in new[] { Path.Combine("Properties", "AssemblyInfo.cs"), "AssemblyInfo.cs" })
+        {
+            var path = Path.Combine(projDir, rel);
+            if (!File.Exists(path)) continue;
+            try
+            {
+                if (File.ReadAllText(path).Contains("AssemblyNativeVersion", StringComparison.Ordinal))
+                    return true;
+            }
+            catch { /* unreadable → treat as ordinary, deletable AssemblyInfo */ }
+        }
+        return false;
+    }
+
+    // Project-relative paths (forward-slashed) of every .cs file on disk that the SDK
+    // would compile by default: all **/*.cs under the project directory, excluding
+    // bin/obj and a hand-written AssemblyInfo.cs. (A deletable AssemblyInfo is removed
+    // from disk by the converter, and a kept nano-specific one is authoritative — in
+    // both cases it must not appear in the Compile Remove list.) Used to detect files
+    // the legacy project deliberately did not compile.
+    private static IEnumerable<string> OnDiskDefaultCompile(string projDir)
+    {
+        var root = Path.GetFullPath(projDir);
+        IEnumerable<string> files;
+        try { files = Directory.EnumerateFiles(root, "*.cs", SearchOption.AllDirectories); }
+        catch { yield break; }
+
+        foreach (var f in files)
+        {
+            var rel = Path.GetRelativePath(root, f).Replace('\\', '/');
+            var lower = rel.ToLowerInvariant();
+            if (lower.StartsWith("bin/") || lower.Contains("/bin/")) continue;
+            if (lower.StartsWith("obj/") || lower.Contains("/obj/")) continue;
+            // A deletable AssemblyInfo.cs is removed from disk by the converter, so it
+            // is neither globbed nor needs a Remove. A KEPT one is authoritative and
+            // must not be Removed either.
+            if (rel.EndsWith("Properties/AssemblyInfo.cs", StringComparison.OrdinalIgnoreCase)
+                || rel.Equals("AssemblyInfo.cs", StringComparison.OrdinalIgnoreCase))
+                continue;
+            yield return rel;
+        }
     }
 
     private static void FoldNuspec(string projDir, Action<string, string?> setProp)
@@ -547,6 +715,8 @@ public sealed class ProjectConverter : IProjectConverter
         Dictionary<string, string> pkgRefs,
         List<string> projRefs,
         List<XElement> keepItems,
+        List<string> compileRemoves,
+        List<string> imports,
         ConversionOptions o,
         bool cpmActive)
     {
@@ -581,14 +751,46 @@ public sealed class ProjectConverter : IProjectConverter
         {
             sb.Append("  <ItemGroup>\n");
             foreach (var el in keepItems)
-            {
-                var attrs = string.Join(" ", el.Attributes().Select(a => $"{a.Name.LocalName}=\"{Escape(a.Value)}\""));
-                sb.Append($"    <{el.Name.LocalName} {attrs} />\n");
-            }
+                AppendItem(sb, el);
             sb.Append("  </ItemGroup>\n\n");
         }
+        // Files the legacy project deliberately did not compile but that the SDK's
+        // **/*.cs glob would otherwise pick up: exclude them so the converted project
+        // builds the same source set as the original.
+        if (compileRemoves.Count > 0)
+        {
+            sb.Append("  <ItemGroup>\n");
+            foreach (var rel in compileRemoves)
+                sb.Append($"    <Compile Remove=\"{Escape(rel.Replace('/', '\\'))}\" />\n");
+            sb.Append("  </ItemGroup>\n\n");
+        }
+        // Shared Project imports carry source into the project; emit them with the
+        // Shared label MSBuild/VS expects for a .projitems import.
+        foreach (var import in imports)
+            sb.Append($"  <Import Project=\"{Escape(import)}\" Label=\"Shared\" />\n");
+        if (imports.Count > 0) sb.Append('\n');
         sb.Append("</Project>\n");
         return sb.ToString();
+    }
+
+    // Renders one kept item element, preserving its attributes AND its child-element
+    // metadata (Generator, LastGenOutput, CopyToOutputDirectory, Link, …). Earlier the
+    // emitter wrote attributes only, silently dropping the child metadata that, for an
+    // Update item, is the whole point of carrying it through.
+    private static void AppendItem(StringBuilder sb, XElement el)
+    {
+        var attrs = string.Join(" ", el.Attributes().Select(a => $"{a.Name.LocalName}=\"{Escape(a.Value)}\""));
+        var children = el.Elements().ToList();
+        var name = el.Name.LocalName;
+        if (children.Count == 0)
+        {
+            sb.Append($"    <{name} {attrs} />\n");
+            return;
+        }
+        sb.Append($"    <{name} {attrs}>\n");
+        foreach (var c in children)
+            sb.Append($"      <{c.Name.LocalName}>{Escape(c.Value)}</{c.Name.LocalName}>\n");
+        sb.Append($"    </{name}>\n");
     }
 
     private static string Escape(string s) => s
