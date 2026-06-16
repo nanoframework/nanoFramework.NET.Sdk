@@ -4,9 +4,9 @@
     <Project Path="tools/nano/nanoFramework.Tool/nanoFramework.Tool.csproj" />
     <Project Path="tools/nano/nanoFramework.Tool.Tests/nanoFramework.Tool.Tests.csproj" />
   </Folder>
-  <Folder Name="/tools/NanoMigrate/" />
-  <Folder Name="/tools/NanoMigrate/src/">
-    <Project Path="tools/NanoMigrate/src/NanoMigrate.Cli.Commands/NanoMigrate.Cli.Commands.csproj" />
-    <Project Path="tools/NanoMigrate/src/NanoMigrate.Core/NanoMigrate.Core.csproj" />
+  <Folder Name="/tools/migrate/" />
+  <Folder Name="/tools/migrate/src/">
+    <Project Path="tools/migrate/src/NanoMigrate.Cli.Commands/NanoMigrate.Cli.Commands.csproj" />
+    <Project Path="tools/migrate/src/NanoMigrate.Core/NanoMigrate.Core.csproj" />
   </Folder>
 </Solution>

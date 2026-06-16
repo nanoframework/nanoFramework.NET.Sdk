@@ -42,7 +42,7 @@
   <ItemGroup>
     <!-- The built-in `migrate` command is the shared Spectre command sitting over
          the NanoMigrate.Core engine; reused verbatim from the standalone CLI. -->
-    <ProjectReference Include="..\..\NanoMigrate\src\NanoMigrate.Cli.Commands\NanoMigrate.Cli.Commands.csproj" />
+    <ProjectReference Include="..\..\migrate\src\NanoMigrate.Cli.Commands\NanoMigrate.Cli.Commands.csproj" />
   </ItemGroup>
 
   <ItemGroup>
