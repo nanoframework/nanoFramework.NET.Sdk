@@ -47,6 +47,21 @@ public sealed record ConversionOptions
     public bool SkipSolutionRewrite { get; init; }
 
     /// <summary>
+    /// After a real (non-dry-run) migration, verify the result by building the
+    /// affected solution(s)/project(s) with the <c>dotnet</c> CLI. <c>null</c> (the
+    /// default) means "verify on for real runs, off for dry-run"; set
+    /// <c>true</c>/<c>false</c> to force it on/off. A failed verification is what
+    /// triggers the rollback prompt.
+    /// </summary>
+    public bool? Verify { get; init; }
+
+    /// <summary>
+    /// Resolves <see cref="Verify"/> against <see cref="DryRun"/>: dry-run never
+    /// verifies; otherwise the default is on.
+    /// </summary>
+    public bool VerifyEffective => !DryRun && (Verify ?? true);
+
+    /// <summary>
     /// Central Package Management (CPM) override. <c>null</c> (the default) means
     /// auto-detect: the converter walks up from the project directory for a
     /// <c>Directory.Packages.props</c> with

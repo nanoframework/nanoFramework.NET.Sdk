@@ -7,7 +7,21 @@ using static NanoFramework.Migrate.Cli.Rendering.ConsoleSupport;
 
 namespace NanoFramework.Migrate.Cli.Commands;
 
-public sealed class MigrateSettings : CommandSettings
+/// <summary>
+/// A small shared base so the <c>migrate</c>, <c>clean</c> and <c>rollback</c>
+/// commands declare the common <c>-y|--yes</c> flag once. (The commands are sibling
+/// top-level commands rather than subcommands of <c>migrate</c> because Spectre.Cli
+/// cannot host a command that is both a branch/default AND takes a positional
+/// argument, and <c>migrate &lt;path&gt;</c> must keep working.)
+/// </summary>
+public abstract class AssumeYesSettings : CommandSettings
+{
+    [CommandOption("-y|--yes")]
+    [Description("Skip interactive prompts: proceed with the default action. (Non-interactive runs never prompt regardless.)")]
+    public bool AssumeYes { get; init; }
+}
+
+public sealed class MigrateSettings : AssumeYesSettings
 {
     [CommandArgument(0, "<path>")]
     [Description("A .nfproj file, a solution (.sln/.slnx), or a directory. "
@@ -43,14 +57,20 @@ public sealed class MigrateSettings : CommandSettings
     [Description("Only convert .nfproj whose path (relative to <path>) matches the glob; the solutions referencing any matched project are updated. Supports *, ** and ?. Example: \"Beginner/**\".")]
     public string? Glob { get; init; }
 
-    [CommandOption("-y|--yes")]
-    [Description("Skip interactive prompts (Proceed? / solution selection): select all affected solutions and proceed. (Non-interactive runs never prompt regardless.)")]
-    public bool AssumeYes { get; init; }
+    [CommandOption("--verify")]
+    [Description("After a real migration, build the affected solution(s)/project(s) to verify the result; a failed build offers a rollback. Default: on for real runs, off for --dry-run.")]
+    public bool Verify { get; init; }
+
+    [CommandOption("--no-verify")]
+    [Description("Skip the post-migration build verification.")]
+    public bool NoVerify { get; init; }
 
     public override ValidationResult Validate()
     {
         if (Ext is not (".nfproj" or ".csproj"))
             return ValidationResult.Error("--ext must be .nfproj or .csproj");
+        if (Verify && NoVerify)
+            return ValidationResult.Error("--verify and --no-verify are mutually exclusive");
         return ValidationResult.Success();
     }
 
@@ -62,6 +82,9 @@ public sealed class MigrateSettings : CommandSettings
         NoBackup = NoBackup,
         DryRun = DryRun,
         Glob = Glob,
+        // --verify forces on, --no-verify forces off, neither leaves the default
+        // (on for real runs, off for dry-run).
+        Verify = Verify ? true : NoVerify ? false : (bool?)null,
     };
 }
 
@@ -110,8 +133,24 @@ public sealed class MigrateCommand : Command<MigrateSettings>
 
         if (!Confirm($"Proceed with {targets.Count} conversion(s)?", settings, o)) return AbortedExit();
 
+        // Record a rollback journal (real runs only): back up every file the
+        // conversions will modify or delete BEFORE the converter touches disk.
+        var journal = OpenJournal(baseDir, o);
+        if (journal is not null)
+            RecordJournal(journal, targets, o, extraSolutions: null);
+
         var results = ProcessProjects(targets, baseDir, o);
-        return Report(results, baseDir, o, rewritten: Array.Empty<string>());
+        journal?.Save();
+
+        var report = Report(results, baseDir, o, rewritten: Array.Empty<string>());
+
+        // Verification targets in loose mode are the converted projects themselves
+        // (no host-owned solution set). A failed verify can roll the run back.
+        var verifyTargets = results
+            .Where(r => r.Result.Status is ConvertStatus.Converted or ConvertStatus.Review)
+            .Select(r => r.Result.OutputPath)
+            .ToList();
+        return VerifyAndMaybeRollback(report, verifyTargets, journal, baseDir, settings, o);
     }
 
     // The solution-aware flow: pick the candidate solutions (multi-select / confirm),
@@ -154,6 +193,13 @@ public sealed class MigrateCommand : Command<MigrateSettings>
         // The host owns solution retargeting here, so the converter must not also
         // walk up and rewrite solutions the user did not select.
         var convOpts = o with { SkipSolutionRewrite = true };
+
+        // Record a rollback journal (real runs only): back up the files the
+        // conversions touch PLUS the chosen solutions the host will rewrite itself.
+        var journal = OpenJournal(baseDir, o);
+        if (journal is not null)
+            RecordJournal(journal, targets, convOpts, extraSolutions: chosen.Select(c => c.Solution.Path));
+
         var results = ProcessProjects(targets, baseDir, convOpts);
 
         // Retarget exactly the chosen solutions to the converted projects. Only
@@ -172,7 +218,121 @@ public sealed class MigrateCommand : Command<MigrateSettings>
                     rewritten.Add(c.Solution.Path);
         }
 
-        return Report(results, baseDir, o, rewritten);
+        journal?.Save();
+        var report = Report(results, baseDir, o, rewritten);
+
+        // Verify by building exactly the chosen solutions.
+        var verifyTargets = chosen.Select(c => c.Solution.Path).ToList();
+        return VerifyAndMaybeRollback(report, verifyTargets, journal, baseDir, settings, o);
+    }
+
+    // Opens a rollback journal rooted at baseDir for real runs only; dry-runs return
+    // null (nothing is written, nothing to reverse).
+    private static RollbackJournal? OpenJournal(string baseDir, ConversionOptions o) =>
+        o.DryRun ? null : RollbackJournal.Start(baseDir);
+
+    // Backs up — into the journal — every file the conversions will modify or delete,
+    // and records the files they will create, by analysing each target with a dry-run
+    // preview pass FIRST (before any real write). extraSolutions are host-rewritten
+    // solutions to back up as well.
+    private void RecordJournal(RollbackJournal journal, List<string> targets, ConversionOptions o,
+        IEnumerable<string>? extraSolutions)
+    {
+        var dryOpts = o with { DryRun = true };
+        var extras = extraSolutions?.ToList();
+        foreach (var nf in targets)
+        {
+            ConvertResult preview;
+            try { preview = _converter.Convert(nf, dryOpts); }
+            catch { continue; } // a project that fails to analyse is converted (and reported) normally; just not journaled
+            if (preview.AlreadySdk) continue;
+            MigrationJournaling.Record(journal, preview, extras);
+            extras = null; // back up the host solutions once, not per project
+        }
+    }
+
+    // Runs the verification build (when enabled) and, on failure, applies the rollback
+    // policy: prompt-and-revert interactively, or keep-and-advise non-interactively.
+    // Maps to the final exit code. When verification is off/clean, returns the
+    // already-computed migrate exit code unchanged.
+    private int VerifyAndMaybeRollback(int migrateExit, List<string> verifyTargets,
+        RollbackJournal? journal, string baseDir, MigrateSettings settings, ConversionOptions o)
+    {
+        if (!o.VerifyEffective || verifyTargets.Count == 0)
+            return migrateExit;
+
+        var builder = new SolutionBuilder();
+        List<BuildOutcome> outcomes;
+        bool toolMissing = false;
+        if (IsInteractive())
+        {
+            List<BuildOutcome>? captured = null;
+            AnsiConsole.Status().Spinner(Spinner.Known.Dots).Start("Verifying build…", ctx =>
+                captured = builder.VerifyAll(verifyTargets,
+                    t => ctx.Status($"Building [blue]{Esc(Path.GetFileName(t))}[/]…"),
+                    () => toolMissing = true));
+            outcomes = captured!;
+        }
+        else
+        {
+            outcomes = builder.VerifyAll(verifyTargets, null, () => toolMissing = true);
+        }
+
+        if (toolMissing)
+            AnsiConsole.MarkupLine("[yellow]warning:[/] dotnet not found on PATH — build verification skipped.");
+
+        MigrateRenderer.RenderVerifyTable(outcomes, baseDir);
+
+        var verifyOutcome = Verification.Evaluate(outcomes);
+        if (verifyOutcome != VerifyOutcome.Failed)
+            return migrateExit;
+
+        var failed = Verification.FailedCount(outcomes);
+        AnsiConsole.WriteLine();
+        AnsiConsole.MarkupLine($"[red]Build verification failed for {failed} target(s).[/]");
+
+        var interactive = IsInteractive() && !settings.AssumeYes;
+        bool? answer = null;
+        if (interactive)
+            answer = AnsiConsole.Confirm(
+                $"Migration verification failed for {failed} target(s). Roll back all changes?", defaultValue: false);
+        else if (settings.AssumeYes)
+            // --yes is about skipping prompts to PROCEED, never to silently destroy a
+            // migration; a failed verify under --yes keeps the changes (advise rollback).
+            answer = false;
+
+        var decision = Verification.Decide(verifyOutcome, interactive, answer);
+        switch (decision)
+        {
+            case RollbackDecision.RollBack:
+                ApplyRollback(journal, baseDir);
+                AnsiConsole.MarkupLine("[green]All changes rolled back.[/]");
+                return 1;
+            case RollbackDecision.KeepInteractive:
+                AnsiConsole.MarkupLine(
+                    $"[yellow]Changes kept.[/] Run [bold]rollback \"{Esc(baseDir)}\"[/] later to revert.");
+                return 1;
+            case RollbackDecision.KeepNonInteractive:
+            default:
+                AnsiConsole.MarkupLine(
+                    $"[yellow]Changes kept (non-interactive).[/] Run [bold]rollback \"{Esc(baseDir)}\"[/] to revert.");
+                return 1;
+        }
+    }
+
+    // Reverts the just-recorded run from the live journal (preferred), falling back to
+    // the latest saved manifest under baseDir. Removes the backup set on success.
+    private static void ApplyRollback(RollbackJournal? journal, string baseDir)
+    {
+        RollbackResult? result = null;
+        if (journal is not null && !journal.IsEmpty && File.Exists(journal.ManifestPath))
+            result = RollbackJournal.ApplyAndCleanup(journal.ManifestPath);
+        if (result is null)
+        {
+            var latest = RollbackJournal.ManifestPaths(baseDir).FirstOrDefault();
+            if (latest is not null) result = RollbackJournal.ApplyAndCleanup(latest);
+        }
+        if (result is not null) MigrateRenderer.RenderRollbackResult(result, baseDir);
     }
 
     // Decides which candidate solutions to operate on. Explicit single solution: no

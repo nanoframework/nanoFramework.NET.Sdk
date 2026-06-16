@@ -47,9 +47,10 @@ static CommandApp BuildApp()
         config.PropagateExceptions();
 
         // Built-in: migrate (in-proc, over NanoMigrate.Core via the shared command).
-        config.AddCommand<MigrateCommand>("migrate")
-            .WithDescription("Convert legacy .nfproj projects to the SDK-style project system.")
-            .WithExample("migrate", "./samples", "--glob", "Beginner/**", "--dry-run");
+        // The shared registration adds `migrate` plus the sibling `clean` and
+        // `rollback` commands, so the umbrella `nano` matches `nano-migrate`.
+        MigrateRegistration.Add(config,
+            "Convert legacy .nfproj projects to the SDK-style project system.");
 
         // External: flash (wraps the prebuilt nanoff flasher).
         config.AddCommand<FlashCommand>("flash")

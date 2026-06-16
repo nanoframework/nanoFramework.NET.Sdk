@@ -49,9 +49,9 @@ static CommandApp BuildApp(out CommandApp app)
         // errors render cleanly without a stack trace.
         config.PropagateExceptions();
 
-        config.AddCommand<MigrateCommand>("migrate")
-            .WithDescription("Convert a .nfproj, or every .nfproj under a directory.")
-            .WithExample("migrate", "./samples", "--glob", "Beginner/**", "--dry-run");
+        // migrate + clean + rollback, registered once and shared with the umbrella tool.
+        MigrateRegistration.Add(config,
+            "Convert a .nfproj, or every .nfproj under a directory.");
 
         config.AddCommand<CloneCommand>("clone")
             .WithDescription("Clone all matching repos from a GitHub org.")

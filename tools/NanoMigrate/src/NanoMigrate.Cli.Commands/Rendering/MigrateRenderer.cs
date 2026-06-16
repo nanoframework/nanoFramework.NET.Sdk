@@ -144,6 +144,53 @@ public static class MigrateRenderer
         return rel.StartsWith("..", StringComparison.Ordinal) ? Path.GetFileName(path) : rel;
     }
 
+    // The verification build results: one row per target with a Pass/Fail/Skipped
+    // badge and (on failure) a short error tail. Pure presentation over Core data.
+    public static void RenderVerifyTable(IReadOnlyList<BuildOutcome> outcomes, string baseDir)
+    {
+        if (outcomes.Count == 0) return;
+
+        var table = new Table().Border(TableBorder.Rounded).Expand();
+        table.Title = new TableTitle("Build verification");
+        table.AddColumn("Target");
+        table.AddColumn("Result");
+        table.AddColumn("Details");
+
+        foreach (var o in outcomes)
+        {
+            var (label, color) = o.Skipped ? ("Skipped", "grey")
+                : o.Succeeded ? ("Pass", "green")
+                : ("Fail", "red");
+            var details = o.Skipped ? Esc(o.Message ?? "skipped")
+                : o.Succeeded ? "[grey]—[/]"
+                : $"[red]exit {o.ExitCode}[/]\n{Esc(Truncate(o.ErrorTail, 600))}";
+            table.AddRow(
+                new Markup($"[blue]{Esc(RelOrName(baseDir, o.Target))}[/]"),
+                new Markup($"[{color}]{label}[/]"),
+                new Markup(details));
+        }
+        AnsiConsole.WriteLine();
+        AnsiConsole.Write(table);
+    }
+
+    // The result of a rollback: what was restored/deleted (grouped notice).
+    public static void RenderRollbackResult(RollbackResult result, string baseDir)
+    {
+        AnsiConsole.WriteLine();
+        foreach (var r in result.Restored)
+            AnsiConsole.MarkupLine($"[green]restored[/] {Esc(RelOrName(baseDir, r))}");
+        foreach (var d in result.Deleted)
+            AnsiConsole.MarkupLine($"[yellow]removed[/] {Esc(RelOrName(baseDir, d))}");
+        foreach (var p in result.Problems)
+            AnsiConsole.MarkupLine($"[red]rollback issue:[/] {Esc(p)}");
+        AnsiConsole.WriteLine();
+        AnsiConsole.MarkupLine($"[bold]rolled back {result.Total} file(s)[/] "
+            + $"([green]{result.Restored.Count} restored[/], [yellow]{result.Deleted.Count} removed[/]).");
+    }
+
+    private static string Truncate(string s, int max) =>
+        s.Length <= max ? s : s[..max] + "…";
+
     private static (string label, string color) StatusLabel(ConvertStatus s) => s switch
     {
         ConvertStatus.Converted => ("Converted", "green"),
