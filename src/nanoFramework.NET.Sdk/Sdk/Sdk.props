@@ -26,6 +26,18 @@
 
     <!-- Suppress NU1701 warning for the expected fallback -->
     <NoWarn>$(NoWarn);NU1701</NoWarn>
+
+    <!--
+      VS source-level debugging of nanoFramework projects resolves source<->IL from a
+      *Windows/full* PDB. Emit one for Debug. This MUST be set before the Microsoft.NET.Sdk
+      import below (that SDK defaults DebugType=portable when empty, so its default must be
+      pre-empted). Built in VS (.NET-Framework csc) `full` yields a Windows PDB and source
+      breakpoints bind; a portable PDB makes VS bind at the method entry only (one startup
+      hit, never on the line). Under `dotnet build` (.NET-Core csc) `full` still emits
+      portable, but the CLI doesn't debug — so Debug=full is the correct default. VS passes
+      Configuration as a global property, so it's set here; Release/CLI fall through to portable.
+    -->
+    <DebugType Condition="'$(DebugType)' == '' and '$(Configuration)' == 'Debug'">full</DebugType>
   </PropertyGroup>
 
   <!-- ============================================================ -->
