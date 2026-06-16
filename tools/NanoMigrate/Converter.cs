@@ -4,11 +4,41 @@ using System.Xml.Linq;
 
 namespace NanoFramework.Migrate;
 
+/// <summary>How a single project ended up after a (dry-run or real) conversion.</summary>
+internal enum ConvertStatus
+{
+    Converted,   // converted cleanly
+    Skipped,     // already SDK-style; nothing to do
+    Review,      // converted, but flagged items need a human
+    Error,       // threw while converting
+}
+
 /// <summary>Outcome of converting a single project.</summary>
 internal sealed class ConvertResult
 {
     public required string OutputPath { get; init; }
     public List<string> Review { get; } = new();
+
+    /// <summary>True when the project was already SDK-style and was left untouched.</summary>
+    public bool AlreadySdk { get; set; }
+
+    /// <summary>Resolved PackageReferences (id -> version) the emitted project will carry.</summary>
+    public List<KeyValuePair<string, string>> Packages { get; } = new();
+
+    /// <summary>Files this conversion deletes (or, in dry-run, would delete).</summary>
+    public List<string> DeletedFiles { get; } = new();
+
+    /// <summary>.sln files this conversion retargets (or, in dry-run, would retarget).</summary>
+    public List<string> UpdatedSolutions { get; } = new();
+
+    /// <summary>Set when the conversion threw; used to render a red Error row.</summary>
+    public string? Error { get; set; }
+
+    public ConvertStatus Status =>
+        Error is not null ? ConvertStatus.Error
+        : AlreadySdk       ? ConvertStatus.Skipped
+        : Review.Count > 0 ? ConvertStatus.Review
+        :                    ConvertStatus.Converted;
 }
 
 /// <summary>
@@ -66,8 +96,11 @@ internal static class Converter
         // the root. Treat it as already-converted and skip without touching disk,
         // so a second run over a repo is a true no-op rather than destructive.
         if (root.Attribute("Sdk") is not null)
-            return new ConvertResult { OutputPath = Path.GetFullPath(nfproj) }
-                .With(new[] { "already SDK-style; skipped" });
+        {
+            var skipped = new ConvertResult { OutputPath = Path.GetFullPath(nfproj), AlreadySdk = true };
+            skipped.Review.Add("already SDK-style; skipped");
+            return skipped;
+        }
 
         var pkgs = LoadPackagesConfig(projDir);
 
@@ -156,6 +189,23 @@ internal static class Converter
         var xml = Emit(props, pkgRefs, projRefs, keepItems, o);
 
         var outPath = Path.ChangeExtension(Path.GetFullPath(nfproj), o.Ext);
+        var nfFull = Path.GetFullPath(nfproj);
+        var replacingNfproj = !string.Equals(outPath, nfFull, StringComparison.OrdinalIgnoreCase);
+
+        var result = new ConvertResult { OutputPath = outPath };
+        result.Review.AddRange(review);
+        result.Packages.AddRange(pkgRefs.OrderBy(k => k.Key, StringComparer.OrdinalIgnoreCase));
+
+        // Compute the set of files that will be (or, in dry-run, would be) removed
+        // and the solutions that will be retargeted. This drives the dry-run
+        // preview and is identical to what the real run acts on.
+        if (replacingNfproj) result.DeletedFiles.Add(nfFull);
+        var pc = Path.Combine(projDir, "packages.config");
+        if (File.Exists(pc)) result.DeletedFiles.Add(Path.GetFullPath(pc));
+        foreach (var ai in ExistingAssemblyInfo(projDir)) result.DeletedFiles.Add(ai);
+        if (replacingNfproj)
+            foreach (var sln in SolutionsReferencing(projDir, nfFull)) result.UpdatedSolutions.Add(sln);
+
         if (!o.DryRun)
         {
             // Never clobber an existing backup: the original first-run .bak must
@@ -163,13 +213,12 @@ internal static class Converter
             if (!o.NoBackup && !File.Exists(nfproj + ".bak")) File.Copy(nfproj, nfproj + ".bak", overwrite: false);
             File.WriteAllText(outPath, xml, new UTF8Encoding(false));
             // If we emitted a .csproj alongside, retire the original .nfproj.
-            if (!string.Equals(outPath, Path.GetFullPath(nfproj), StringComparison.OrdinalIgnoreCase))
+            if (replacingNfproj)
             {
                 File.Delete(nfproj);
                 // Point any .sln entries at the new .csproj (idempotent).
                 UpdateSolutions(projDir, nfproj, outPath);
             }
-            var pc = Path.Combine(projDir, "packages.config");
             if (File.Exists(pc)) File.Delete(pc);
             // The SDK default **/*.cs glob plus generated assembly info would
             // otherwise produce duplicate-attribute build errors, so delete a
@@ -178,7 +227,33 @@ internal static class Converter
             DeleteAssemblyInfo(projDir);
         }
 
-        return new ConvertResult { OutputPath = outPath }.With(review);
+        return result;
+    }
+
+    // Paths of any hand-written AssemblyInfo.cs that exist on disk (the files
+    // DeleteAssemblyInfo would remove). Used to preview deletions in dry-run.
+    private static IEnumerable<string> ExistingAssemblyInfo(string projDir)
+    {
+        foreach (var rel in new[] { Path.Combine("Properties", "AssemblyInfo.cs"), "AssemblyInfo.cs" })
+        {
+            var path = Path.Combine(projDir, rel);
+            if (File.Exists(path)) yield return Path.GetFullPath(path);
+        }
+    }
+
+    // The .sln files that currently still reference the .nfproj (i.e. those
+    // UpdateSolutions would rewrite). Used to preview .sln edits in dry-run.
+    private static IEnumerable<string> SolutionsReferencing(string projDir, string nfproj)
+    {
+        var nfName = Path.GetFileName(nfproj);
+        foreach (var sln in FindSolutionFiles(projDir))
+        {
+            string text;
+            try { text = File.ReadAllText(sln); }
+            catch { continue; }
+            if (text.Contains(nfName, StringComparison.OrdinalIgnoreCase))
+                yield return sln;
+        }
     }
 
     // Parses the "packages\<Id>.<Version>\" folder segment of a HintPath into a
@@ -423,10 +498,4 @@ internal static class Converter
 
     private static string Escape(string s) => s
         .Replace("&", "&amp;").Replace("<", "&lt;").Replace(">", "&gt;").Replace("\"", "&quot;");
-
-    private static ConvertResult With(this ConvertResult r, IEnumerable<string> review)
-    {
-        r.Review.AddRange(review);
-        return r;
-    }
 }

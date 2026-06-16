@@ -1,5 +1,6 @@
 using System.Net.Http.Headers;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 
 namespace NanoFramework.Migrate;
 
@@ -28,6 +29,11 @@ internal sealed class Options
     public string Ext { get; private set; } = ".csproj";
     public bool DryRun { get; private set; }
     public bool NoBackup { get; internal set; }
+    // Glob filter (relative to the input directory) selecting which .nfproj to
+    // convert. Null means "all .nfproj recursively" (the original behavior).
+    public string? Glob { get; private set; }
+    // Skip the interactive "Proceed?" confirmation for real (non-dry-run) runs.
+    public bool AssumeYes { get; private set; }
 
     // clone
     public string Org { get; private set; } = "nanoframework";
@@ -65,6 +71,8 @@ internal sealed class Options
                     break;
                 case "--dry-run": case "--no-write": o.DryRun = true; break;
                 case "--no-backup": o.NoBackup = true; break;
+                case "--glob": o.Glob = Next(a); break;
+                case "--yes": case "-y": o.AssumeYes = true; break;
                 case "--org": o.Org = Next(a); break;
                 case "--filter": o.Filter = Next(a); break;
                 case "--token": o.Token = Next(a); break;
@@ -128,5 +136,62 @@ internal static class GitHub
             if (arr.GetArrayLength() < 100) break;
         }
         return repos;
+    }
+}
+
+/// <summary>
+/// Small hand-rolled glob matcher (no external dependency). Matches a path that
+/// is relative to the input directory against a pattern supporting:
+///   *   any run of characters except a path separator
+///   **  any run of characters including path separators (spanning directories)
+///   ?   exactly one character except a path separator
+/// Matching is case-insensitive and separator-insensitive ('/' and '\' are
+/// treated as equivalent), and is anchored to the whole relative path.
+/// </summary>
+internal static class Glob
+{
+    public static bool IsMatch(string relativePath, string pattern)
+    {
+        var input = Normalize(relativePath);
+        var regex = ToRegex(Normalize(pattern));
+        return regex.IsMatch(input);
+    }
+
+    private static string Normalize(string s) => s.Replace('\\', '/').Trim('/');
+
+    // Translates a normalized ('/'-separated) glob into an anchored, case-insensitive
+    // regex. Literal characters are escaped; only *, ** and ? carry meaning.
+    private static Regex ToRegex(string pattern)
+    {
+        var sb = new System.Text.StringBuilder("^");
+        for (int i = 0; i < pattern.Length; i++)
+        {
+            var c = pattern[i];
+            switch (c)
+            {
+                case '*':
+                    if (i + 1 < pattern.Length && pattern[i + 1] == '*')
+                    {
+                        i++;                       // consume the second '*'
+                        // "**/" (or trailing "**") spans directories; collapse any
+                        // following slash so "Beginner/**" also matches "Beginner".
+                        if (i + 1 < pattern.Length && pattern[i + 1] == '/') i++;
+                        sb.Append(".*");
+                    }
+                    else
+                    {
+                        sb.Append("[^/]*");        // single star: stay within a segment
+                    }
+                    break;
+                case '?':
+                    sb.Append("[^/]");
+                    break;
+                default:
+                    sb.Append(Regex.Escape(c.ToString()));
+                    break;
+            }
+        }
+        sb.Append('$');
+        return new Regex(sb.ToString(), RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
     }
 }

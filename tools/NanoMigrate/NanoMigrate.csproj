@@ -11,7 +11,11 @@
     <!-- Run through the `dotnet` host rather than a native launcher, so the tool
          works even where the build output directory is mounted noexec. -->
     <UseAppHost>false</UseAppHost>
-    <!-- BCL-only: no PackageReferences, so this builds and runs fully offline. -->
   </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Polished CLI: header rules, progress, summary tables, panels. -->
+    <PackageReference Include="Spectre.Console" Version="0.57.0" />
+  </ItemGroup>
 
 </Project>
