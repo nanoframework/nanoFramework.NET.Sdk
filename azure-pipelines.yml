@@ -207,11 +207,19 @@ stages:
           $nugetConfig | Set-Content -Path "$(Build.SourcesDirectory)/test/SmokeTest/NuGet.Azdo.Config"
 
     - task: DotNetCoreCLI@2
+      displayName: Restore SmokeTest
+      inputs:
+        command: 'restore'
+        projects: 'test/SmokeTest/SmokeTest.csproj'
+        feedsToUse: 'config'
+        nugetConfigPath: '$(Build.SourcesDirectory)/test/SmokeTest/NuGet.Azdo.Config'
+
+    - task: DotNetCoreCLI@2
       displayName: Build SmokeTest
       inputs:
         command: 'build'
         projects: 'test/SmokeTest/SmokeTest.csproj'
-        arguments: '--configuration $(buildConfiguration) --configfile "$(Build.SourcesDirectory)/test/SmokeTest/NuGet.Azdo.Config"'
+        arguments: '--configuration $(buildConfiguration) --no-restore'
     
     - task: NuGetCommand@2
       condition: >-
