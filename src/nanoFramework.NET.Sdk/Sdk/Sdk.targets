@@ -8,9 +8,11 @@
 
     This file is a thin orchestrator. It owns the Microsoft.NET.Sdk targets import chain
     and <Import>s the focused targets-time modules:
-      - nanoFramework.Mdp.targets         — the Metadata Processor build pipeline,
+      - nanoFramework.Mdp.targets          — MetadataProcessor + build-pipeline orchestration,
+      - nanoFramework.Resources.targets    — managed resource (.resx -> .nanoresources) generation,
+      - nanoFramework.Output.targets       — binary output, artifact copy, and clean,
       - nanoFramework.Capabilities.targets — the CPS capabilities + debugger property page.
-    Both are imported AFTER the Microsoft.NET.Sdk import so that project-body values
+    All are imported AFTER the Microsoft.NET.Sdk import so that project-body values
     (NanoIsCoreLibrary) and the standard build properties ($(TargetName) etc.) are set.
   -->
 
@@ -65,12 +67,17 @@
   </PropertyGroup>
 
   <!-- ============================================================ -->
-  <!--  Metadata Processor build pipeline                            -->
-  <!--  (MDP PackageReference, task resolution, MDP/copy/clean/      -->
-  <!--   resource/binary targets — depend on TargetName /            -->
-  <!--   NanoIsCoreLibrary set in the project body)                  -->
+  <!--  nanoFramework build pipeline (split by concern)              -->
+  <!--  Mdp = MetadataProcessor + pipeline orchestration; Resources  -->
+  <!--  = resource generation; Output = binary / copy / clean.       -->
+  <!--  Import ORDER matters: Mdp defines the shared                 -->
+  <!--  $(_NfSdkTasksDir) / $(NanoFramework_*) properties the other  -->
+  <!--  two modules rely on. All depend on TargetName /              -->
+  <!--  NanoIsCoreLibrary set in the project body.                   -->
   <!-- ============================================================ -->
   <Import Project="$(MSBuildThisFileDirectory)nanoFramework.Mdp.targets" />
+  <Import Project="$(MSBuildThisFileDirectory)nanoFramework.Resources.targets" />
+  <Import Project="$(MSBuildThisFileDirectory)nanoFramework.Output.targets" />
 
   <!-- ============================================================ -->
   <!--  CPS capabilities + debugger property page                    -->

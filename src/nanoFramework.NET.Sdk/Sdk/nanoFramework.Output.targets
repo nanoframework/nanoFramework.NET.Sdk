@@ -1,0 +1,97 @@
+<Project>
+  <!--
+    nanoFramework.Output.targets — final output production and housekeeping.
+
+    Produces the deployable binary (GenerateBinaryOutputTask), copies the .pe /
+    .pdbx artifacts between the intermediate and output directories, and cleans
+    the generated nanoFramework files. These run after the MetadataProcessor has
+    emitted the .pe.
+
+    Imported by Sdk.targets AFTER nanoFramework.Mdp.targets, which defines the
+    shared $(_NfSdkTasksDir) and $(NanoFramework_*) properties used below and
+    wires these targets into the build pipeline (PrepareForRunDependsOn,
+    CleanDependsOn) and the MetaDataProcessor* targets (via CallTarget).
+  -->
+
+  <!-- nanoFramework binary-output task (bundled in SDK) -->
+  <UsingTask TaskName="nanoFramework.Tools.GenerateBinaryOutputTask"
+             Condition="'$(NF_MSBUILDTASK_PATH)' == ''"
+             AssemblyFile="$(_NfSdkTasksDir)nanoFramework.Tools.BuildTasks.dll" />
+  <UsingTask TaskName="nanoFramework.Tools.GenerateBinaryOutputTask"
+             Condition="'$(NF_MSBUILDTASK_PATH)' != ''"
+             AssemblyFile="$(NF_MSBUILDTASK_PATH)\nanoFramework.Tools.BuildTasks.dll" />
+
+  <!-- ============================================================ -->
+  <!--  Clean targets                                                -->
+  <!-- ============================================================ -->
+  <Target Name="NanoFrameworkClean">
+    <Delete Condition="EXISTS('$(OutDir)$(TargetName).pe')"   Files="$(OutDir)$(TargetName).pe" />
+    <Delete Condition="EXISTS('$(OutDir)$(TargetName).pdbx')" Files="$(OutDir)$(TargetName).pdbx" />
+  </Target>
+
+  <!-- ============================================================ -->
+  <!--  Copy targets                                                 -->
+  <!-- ============================================================ -->
+  <Target Name="CopyToOutDir">
+    <Copy Condition="Exists('$(ProjectDir)$(IntermediateOutputPath)$(TargetFileName)')"
+          SourceFiles="$(ProjectDir)$(IntermediateOutputPath)$(TargetFileName)"
+          DestinationFolder="$(OutDir)">
+      <Output TaskParameter="DestinationFiles" ItemName="FileWrites" />
+    </Copy>
+  </Target>
+
+  <Target Name="CopyNanoFrameworkFiles">
+    <Copy Condition="Exists('$(NanoFramework_IntermediateAssembly).pe')"
+          SourceFiles="$(NanoFramework_IntermediateAssembly).pe"
+          DestinationFiles="$(NanoFramework_Assembly).pe" SkipUnchangedFiles="true">
+      <Output TaskParameter="DestinationFiles" ItemName="FileWrites" />
+    </Copy>
+    <Copy Condition="Exists('$(NanoFramework_IntermediateAssembly).pdbx')"
+          SourceFiles="$(NanoFramework_IntermediateAssembly).pdbx"
+          DestinationFiles="$(NanoFramework_Assembly).pdbx" SkipUnchangedFiles="true">
+      <Output TaskParameter="DestinationFiles" ItemName="FileWrites" />
+    </Copy>
+    <Copy SourceFiles="@(ReferenceCopyLocalPaths->'%(RootDir)%(Directory)%(Filename).pe')"
+          DestinationFiles="@(ReferenceCopyLocalPaths->'$(OutDir)%(Filename).pe')"
+          SkipUnchangedFiles="true" ContinueOnError="true">
+      <Output TaskParameter="DestinationFiles" ItemName="FileWrites" />
+    </Copy>
+    <Copy SourceFiles="@(ReferenceCopyLocalPaths->'%(RootDir)%(Directory)%(Filename).pdbx')"
+          DestinationFiles="@(ReferenceCopyLocalPaths->'$(OutDir)%(Filename).pdbx')"
+          SkipUnchangedFiles="true" ContinueOnError="true">
+      <Output TaskParameter="DestinationFiles" ItemName="FileWrites" />
+    </Copy>
+  </Target>
+
+  <Target Name="CopyBackNanoFrameworkDlls">
+    <Copy SourceFiles="@(ReferenceCopyLocalPaths)"
+          DestinationFiles="@(ReferenceCopyLocalPaths->'$(IntermediateOutputPath)%(Filename)%(Extension)')"
+          SkipUnchangedFiles="false">
+      <Output TaskParameter="DestinationFiles" ItemName="FileWrites" />
+    </Copy>
+  </Target>
+
+  <!-- ============================================================ -->
+  <!--  Binary output                                                -->
+  <!-- ============================================================ -->
+  <Target Name="NanoGenerateBinaryOutput"
+          DependsOnTargets="ResolveReferences">
+    <GenerateBinaryOutputTask
+        AssemblyPE="$(NanoFramework_IntermediateAssembly).pe"
+        Assembly="$(NanoFramework_Assembly)$(TargetExt)"
+        AssemblyReferences="@(ReferencePath);@(ReferenceDependencyPaths)">
+      <Output TaskParameter="FileWritten" ItemName="FileWrites" />
+    </GenerateBinaryOutputTask>
+  </Target>
+
+  <!-- Clean extra files for core assembly builds -->
+  <Target Name="NanoCLR_CleanExtraFiles" Condition="'$(NanoIsCoreLibrary)' == 'True'">
+    <Delete Files="$(NFMDP_PE_Compile);$(NFMDP_PE_Compile_NoExt).pdbx;$(NFMDP_PE_DumpExports);$(NFMDP_PE_GenerateDependency)"
+            TreatErrorsAsWarnings="true" />
+  </Target>
+
+  <!-- Suppress manifest/config copy -->
+  <Target Name="_CopyManifestFiles" />
+  <Target Name="_CopyApplicationConfigFiles" />
+
+</Project>

@@ -58,6 +58,8 @@
         Sdk.targets
         nanoFramework.Tfm.props
         nanoFramework.Mdp.targets
+        nanoFramework.Resources.targets
+        nanoFramework.Output.targets
         nanoFramework.Capabilities.targets
         Rules/
           NanoDebugger.xaml
@@ -85,6 +87,8 @@
     <!-- SDK modules (focused includes imported by the orchestrators above) -->
     <None Include="Sdk\nanoFramework.Tfm.props" Pack="true" PackagePath="Sdk" />
     <None Include="Sdk\nanoFramework.Mdp.targets" Pack="true" PackagePath="Sdk" />
+    <None Include="Sdk\nanoFramework.Resources.targets" Pack="true" PackagePath="Sdk" />
+    <None Include="Sdk\nanoFramework.Output.targets" Pack="true" PackagePath="Sdk" />
     <None Include="Sdk\nanoFramework.Capabilities.targets" Pack="true" PackagePath="Sdk" />
 
     <!-- Debugger property-page rule (NanoDebugger flavor) — surfaced via PropertyPageSchema in Sdk.targets -->
