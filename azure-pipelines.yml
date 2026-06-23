@@ -190,16 +190,17 @@ stages:
           artifactType: 'pipeline'
 
       - pwsh: |
-          @"
-          <?xml version="1.0" encoding="utf-8"?>
-          <configuration>
-            <packageSources>
-              <clear />
-              <add key="local-sdk" value="$(Build.ArtifactStagingDirectory)" />
-              <add key="nuget.org" value="https://api.nuget.org/v3/index.json" />
-            </packageSources>
-          </configuration>
-          "@ | Set-Content -Path "$(Build.SourcesDirectory)/test/SmokeTest/NuGet.Azdo.Config"
+          $nugetConfig = @(
+            '<?xml version="1.0" encoding="utf-8"?>'
+            '<configuration>'
+            '  <packageSources>'
+            '    <clear />'
+            '    <add key="local-sdk" value="$(Build.ArtifactStagingDirectory)" />'
+            '    <add key="nuget.org" value="https://api.nuget.org/v3/index.json" />'
+            '  </packageSources>'
+            '</configuration>'
+          )
+          $nugetConfig | Set-Content -Path "$(Build.SourcesDirectory)/test/SmokeTest/NuGet.Azdo.Config"
         displayName: Create NuGet config for SmokeTest
 
       - task: DotNetCoreCLI@2
