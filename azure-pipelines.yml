@@ -67,25 +67,26 @@ stages:
 
       - template: install-nbgv-tool.yml@templates
 
-      - task: SonarCloudPrepare@3
-        condition: >-
-          and(
-            succeeded(),
-            eq(variables['StartReleaseCandidate'], false),
-            not(startsWith(variables['Build.SourceBranch'], 'refs/tags/v')),
-            not(${{ parameters.skipSonarCloudAnalysis }})
-          )
-        displayName: 'Prepare analysis on SonarCloud'
-        inputs:
-          SonarCloud: 'sonarcloud-$(System.TeamProject)'
-          organization: 'nanoframework'
-          scannerMode: 'dotnet'
-          projectKey: 'nanoframework_net-sdk'
-          extraProperties: |
-            sonar.exclusions=**/obj/**,**/*.dll
-            sonar.cs.vscoveragexml.reportsPaths=$(Agent.TempDirectory)/**/**.coverage
-            sonar.cs.vstest.reportsPaths=$(Agent.TempDirectory)/**/**.trx
-            sonar.scanner.skipJreProvisioning=true
+      # waiting for project to be public to enable SonarCloud analysis
+      # - task: SonarCloudPrepare@3
+      #   condition: >-
+      #     and(
+      #       succeeded(),
+      #       eq(variables['StartReleaseCandidate'], false),
+      #       not(startsWith(variables['Build.SourceBranch'], 'refs/tags/v')),
+      #       not(${{ parameters.skipSonarCloudAnalysis }})
+      #     )
+      #   displayName: 'Prepare analysis on SonarCloud'
+      #   inputs:
+      #     SonarCloud: 'sonarcloud-$(System.TeamProject)'
+      #     organization: 'nanoframework'
+      #     scannerMode: 'dotnet'
+      #     projectKey: 'nanoframework_net-sdk'
+      #     extraProperties: |
+      #       sonar.exclusions=**/obj/**,**/*.dll
+      #       sonar.cs.vscoveragexml.reportsPaths=$(Agent.TempDirectory)/**/**.coverage
+      #       sonar.cs.vstest.reportsPaths=$(Agent.TempDirectory)/**/**.trx
+      #       sonar.scanner.skipJreProvisioning=true
 
       - template: install-nuget.yml@templates
 
