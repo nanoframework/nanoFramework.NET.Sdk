@@ -25,6 +25,11 @@
          Sdk.props) + the NanoDebugger rule route F5 to the nanoFramework debug engine. -->
     <ProjectCapability Remove="LaunchProfiles" />
     <ProjectCapability Include="NanoCSharpProject" />
+    <!-- DEPLOYABLE/launchable only for the application (OutputType=Exe). Library projects omit this capability,
+         so VS never marks them for deploy and the nanoFramework deploy / debug-launch providers do not apply to
+         them (their .pe is included in the app's deploy bundle). This stops the redundant per-library deploy
+         transactions that race the debugger for the device ("There were deployment errors"). -->
+    <ProjectCapability Include="NanoDeployableProject" Condition="'$(OutputType)' == 'Exe'" />
   </ItemGroup>
 
   <!-- ============================================================ -->
