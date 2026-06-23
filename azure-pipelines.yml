@@ -97,25 +97,27 @@ stages:
           projects: '$(solution)'
           arguments: '--configuration $(buildConfiguration) /p:PublicRelease=true'
 
-      - task: SonarCloudAnalyze@3
-        condition: >-
-          and(
-            succeeded(),
-            eq(variables['StartReleaseCandidate'], false),
-            not(startsWith(variables['Build.SourceBranch'], 'refs/tags/v'))
-          )
-        displayName: 'Run Code Analysis'
-        continueOnError: true
+      # waiting for project to be public to enable SonarCloud analysis
+      # - task: SonarCloudAnalyze@3
+      #   condition: >-
+      #     and(
+      #       succeeded(),
+      #       eq(variables['StartReleaseCandidate'], false),
+      #       not(startsWith(variables['Build.SourceBranch'], 'refs/tags/v'))
+      #     )
+      #   displayName: 'Run Code Analysis'
+      #   continueOnError: true
 
-      - task: SonarCloudPublish@3
-        condition: >-
-          and(
-            succeeded(),
-            eq(variables['StartReleaseCandidate'], false),
-            not(startsWith(variables['Build.SourceBranch'], 'refs/tags/v'))
-          )
-        displayName: 'Publish Quality Gate Result'
-        continueOnError: true
+      # waiting for project to be public to enable SonarCloud analysis
+      # - task: SonarCloudPublish@3
+      #   condition: >-
+      #     and(
+      #       succeeded(),
+      #       eq(variables['StartReleaseCandidate'], false),
+      #       not(startsWith(variables['Build.SourceBranch'], 'refs/tags/v'))
+      #     )
+      #   displayName: 'Publish Quality Gate Result'
+      #   continueOnError: true
 
       - task: DotNetCoreCLI@2
         displayName: Install Sign Client CLI
