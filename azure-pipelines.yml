@@ -186,8 +186,8 @@ stages:
       displayName: Publish NuGet package
       inputs:
         targetPath: '$(Build.ArtifactStagingDirectory)'
-        artifact: 'NuGetPackage'
-        publishLocation: 'pipeline'
+        artifactName: 'NuGetPackage'
+        artifactType: pipeline
 
     - task: PowerShell@2
       displayName: Create NuGet config for SmokeTest
@@ -241,8 +241,7 @@ stages:
 
 # report build failure to Discord
 - stage: Report_Build_Failure
-  dependsOn:
-    - Build
+  dependsOn: Build
   condition: failed('Build')
 
   jobs:
