@@ -41,172 +41,195 @@ stages:
 ########################
 - stage: Build
   jobs:
-    - job: Build_SDK
-      pool:
-        vmImage: 'windows-latest'
+  - job: Build_SDK
+    pool:
+      vmImage: 'windows-latest'
 
-      variables:
-        - group: sign-client-credentials
-        - name: buildPlatform
-          value: 'Any CPU'  
-        - name: buildConfiguration
-          value: 'Release'
-        - name: solution
-          value: 'nanoFramework.NET.Sdk.sln'
+    variables:
+      - group: sign-client-credentials
+      - name: buildPlatform
+        value: 'Any CPU'  
+      - name: buildConfiguration
+        value: 'Release'
+      - name: solution
+        value: 'nanoFramework.NET.Sdk.sln'
 
-      steps:
-      - checkout: self
-        submodules: true
-        fetchDepth: 0
+    steps:
+    - checkout: self
+      submodules: true
+      fetchDepth: 0
 
-      - script: |
-          git config --global user.email nanoframework@outlook.com
-          git config --global user.name nfbot
-          git config --global core.autocrlf true
-        displayName: Setup git identity
+    - script: |
+        git config --global user.email nanoframework@outlook.com
+        git config --global user.name nfbot
+        git config --global core.autocrlf true
+      displayName: Setup git identity
 
-      - template: install-nbgv-tool.yml@templates
+    - template: install-nbgv-tool.yml@templates
 
-      # waiting for project to be public to enable SonarCloud analysis
-      # - task: SonarCloudPrepare@3
-      #   condition: >-
-      #     and(
-      #       succeeded(),
-      #       eq(variables['StartReleaseCandidate'], false),
-      #       not(startsWith(variables['Build.SourceBranch'], 'refs/tags/v')),
-      #       not(${{ parameters.skipSonarCloudAnalysis }})
-      #     )
-      #   displayName: 'Prepare analysis on SonarCloud'
-      #   inputs:
-      #     SonarCloud: 'sonarcloud-$(System.TeamProject)'
-      #     organization: 'nanoframework'
-      #     scannerMode: 'dotnet'
-      #     projectKey: 'nanoframework_net-sdk'
-      #     extraProperties: |
-      #       sonar.exclusions=**/obj/**,**/*.dll
-      #       sonar.cs.vscoveragexml.reportsPaths=$(Agent.TempDirectory)/**/**.coverage
-      #       sonar.cs.vstest.reportsPaths=$(Agent.TempDirectory)/**/**.trx
-      #       sonar.scanner.skipJreProvisioning=true
+    # waiting for project to be public to enable SonarCloud analysis
+    # - task: SonarCloudPrepare@3
+    #   condition: >-
+    #     and(
+    #       succeeded(),
+    #       eq(variables['StartReleaseCandidate'], false),
+    #       not(startsWith(variables['Build.SourceBranch'], 'refs/tags/v')),
+    #       not(${{ parameters.skipSonarCloudAnalysis }})
+    #     )
+    #   displayName: 'Prepare analysis on SonarCloud'
+    #   inputs:
+    #     SonarCloud: 'sonarcloud-$(System.TeamProject)'
+    #     organization: 'nanoframework'
+    #     scannerMode: 'dotnet'
+    #     projectKey: 'nanoframework_net-sdk'
+    #     extraProperties: |
+    #       sonar.exclusions=**/obj/**,**/*.dll
+    #       sonar.cs.vscoveragexml.reportsPaths=$(Agent.TempDirectory)/**/**.coverage
+    #       sonar.cs.vstest.reportsPaths=$(Agent.TempDirectory)/**/**.trx
+    #       sonar.scanner.skipJreProvisioning=true
 
-      - template: install-nuget.yml@templates
+    - template: install-nuget.yml@templates
 
-      - task: DotNetCoreCLI@2
-        displayName: Build
-        inputs:
-          command: 'build'
-          projects: '$(solution)'
-          arguments: '--configuration $(buildConfiguration) /p:PublicRelease=true'
+    - task: DotNetCoreCLI@2
+      displayName: Build
+      inputs:
+        command: 'build'
+        projects: '$(solution)'
+        arguments: '--configuration $(buildConfiguration) /p:PublicRelease=true'
 
-      # waiting for project to be public to enable SonarCloud analysis
-      # - task: SonarCloudAnalyze@3
-      #   condition: >-
-      #     and(
-      #       succeeded(),
-      #       eq(variables['StartReleaseCandidate'], false),
-      #       not(startsWith(variables['Build.SourceBranch'], 'refs/tags/v'))
-      #     )
-      #   displayName: 'Run Code Analysis'
-      #   continueOnError: true
+    # waiting for project to be public to enable SonarCloud analysis
+    # - task: SonarCloudAnalyze@3
+    #   condition: >-
+    #     and(
+    #       succeeded(),
+    #       eq(variables['StartReleaseCandidate'], false),
+    #       not(startsWith(variables['Build.SourceBranch'], 'refs/tags/v'))
+    #     )
+    #   displayName: 'Run Code Analysis'
+    #   continueOnError: true
 
-      # waiting for project to be public to enable SonarCloud analysis
-      # - task: SonarCloudPublish@3
-      #   condition: >-
-      #     and(
-      #       succeeded(),
-      #       eq(variables['StartReleaseCandidate'], false),
-      #       not(startsWith(variables['Build.SourceBranch'], 'refs/tags/v'))
-      #     )
-      #   displayName: 'Publish Quality Gate Result'
-      #   continueOnError: true
+    # waiting for project to be public to enable SonarCloud analysis
+    # - task: SonarCloudPublish@3
+    #   condition: >-
+    #     and(
+    #       succeeded(),
+    #       eq(variables['StartReleaseCandidate'], false),
+    #       not(startsWith(variables['Build.SourceBranch'], 'refs/tags/v'))
+    #     )
+    #   displayName: 'Publish Quality Gate Result'
+    #   continueOnError: true
 
-      - task: DotNetCoreCLI@2
-        displayName: Install Sign Client CLI
-        condition: >-
-          and(
-            succeeded(),
-            eq(variables['StartReleaseCandidate'], false),
-            not(startsWith(variables['Build.SourceBranch'], 'refs/tags/v'))
+    - task: DotNetCoreCLI@2
+      displayName: Install Sign Client CLI
+      condition: >-
+        and(
+          succeeded(),
+          eq(variables['StartReleaseCandidate'], false),
+          not(startsWith(variables['Build.SourceBranch'], 'refs/tags/v'))
+        )
+      inputs:
+        command: custom
+        custom: tool
+        arguments: install --tool-path . sign --version 0.9.1-beta.23530.1
+
+    - pwsh: |
+        .\sign code azure-key-vault `
+        "**/nanoFramework.Tools.BuildTasks.*" `
+        --base-directory "$(Build.SourcesDirectory)/nanoFramework.NET.Sdk/build/Release" `
+        --description "$(Build.Repository.Name)" `
+        --description-url "https://github.com/$(Build.Repository.Name)" `
+        --azure-key-vault-tenant-id "$(SignTenantId)" `
+        --azure-key-vault-client-id "$(SignClientId)" `
+        --azure-key-vault-client-secret "$(SignClientSecret)" `
+        --azure-key-vault-certificate "$(SignKeyVaultCertificate)" `
+        --azure-key-vault-url "$(SignKeyVaultUrl)" `
+        --timestamp-url http://timestamp.digicert.com
+      displayName: Sign DLLs
+      continueOnError: false
+      condition: >-
+        and(
+          succeeded(),
+          eq(variables['StartReleaseCandidate'], false),
+          not(startsWith(variables['Build.SourceBranch'], 'refs/tags/v'))
+        )
+
+    - task: DotNetCoreCLI@2
+      displayName: Pack
+      inputs:
+        command: 'pack'
+        packagesToPack: '**/src/nanoFramework.NET.Sdk.csproj'
+        versioningScheme: 'off'
+        arguments: '--configuration $(buildConfiguration) /p:PublicRelease=true --output $(Build.ArtifactStagingDirectory)'
+
+    - pwsh: |
+        .\sign code azure-key-vault `
+        "**/*.nupkg" `
+        --base-directory "$(Build.ArtifactStagingDirectory)" `
+        --description "$(Build.Repository.Name)" `
+        --description-url "https://github.com/$(Build.Repository.Name)" `
+        --azure-key-vault-tenant-id "$(SignTenantId)" `
+        --azure-key-vault-client-id "$(SignClientId)" `
+        --azure-key-vault-client-secret "$(SignClientSecret)" `
+        --azure-key-vault-certificate "$(SignKeyVaultCertificate)" `
+        --azure-key-vault-url "$(SignKeyVaultUrl)" `
+        --timestamp-url http://timestamp.digicert.com
+      displayName: Sign NuGet package
+      continueOnError: true
+      condition: >-
+        and(
+          succeeded(),
+          eq(variables['StartReleaseCandidate'], false),
+          not(startsWith(variables['Build.SourceBranch'], 'refs/tags/v'))
+        )
+
+    - task: PublishPipelineArtifact@1
+      displayName: Publish NuGet package
+      inputs:
+        targetPath: '$(Build.ArtifactStagingDirectory)'
+        artifact: 'NuGetPackage'
+        publishLocation: 'pipeline'
+
+    - task: PowerShell@2
+      displayName: Create NuGet config for SmokeTest
+      inputs:
+        targetType: inline
+        script: |
+          $nugetConfig = @(
+            '<?xml version="1.0" encoding="utf-8"?>'
+            '<configuration>'
+            '  <packageSources>'
+            '    <clear />'
+            '    <add key="local-sdk" value="$(Build.ArtifactStagingDirectory)" />'
+            '    <add key="nuget.org" value="https://api.nuget.org/v3/index.json" />'
+            '  </packageSources>'
+            '</configuration>'
           )
-        inputs:
-          command: custom
-          custom: tool
-          arguments: install --tool-path . sign --version 0.9.1-beta.23530.1
+          $nugetConfig | Set-Content -Path "$(Build.SourcesDirectory)/test/SmokeTest/NuGet.Azdo.Config"
 
-      - pwsh: |
-          .\sign code azure-key-vault `
-          "**/nanoFramework.Tools.BuildTasks.*" `
-          --base-directory "$(Build.SourcesDirectory)/nanoFramework.NET.Sdk/build/Release" `
-          --description "$(Build.Repository.Name)" `
-          --description-url "https://github.com/$(Build.Repository.Name)" `
-          --azure-key-vault-tenant-id "$(SignTenantId)" `
-          --azure-key-vault-client-id "$(SignClientId)" `
-          --azure-key-vault-client-secret "$(SignClientSecret)" `
-          --azure-key-vault-certificate "$(SignKeyVaultCertificate)" `
-          --azure-key-vault-url "$(SignKeyVaultUrl)" `
-          --timestamp-url http://timestamp.digicert.com
-        displayName: Sign DLLs
-        continueOnError: false
-        condition: >-
-          and(
-            succeeded(),
-            eq(variables['StartReleaseCandidate'], false),
-            not(startsWith(variables['Build.SourceBranch'], 'refs/tags/v'))
-          )
-
-      - task: DotNetCoreCLI@2
-        displayName: Pack
-        inputs:
-          command: 'pack'
-          packagesToPack: '**/src/nanoFramework.NET.Sdk.csproj'
-          versioningScheme: 'off'
-          arguments: '--configuration $(buildConfiguration) /p:PublicRelease=true --output $(Build.ArtifactStagingDirectory)'
-
-      - pwsh: |
-          .\sign code azure-key-vault `
-          "**/*.nupkg" `
-          --base-directory "$(Build.ArtifactStagingDirectory)" `
-          --description "$(Build.Repository.Name)" `
-          --description-url "https://github.com/$(Build.Repository.Name)" `
-          --azure-key-vault-tenant-id "$(SignTenantId)" `
-          --azure-key-vault-client-id "$(SignClientId)" `
-          --azure-key-vault-client-secret "$(SignClientSecret)" `
-          --azure-key-vault-certificate "$(SignKeyVaultCertificate)" `
-          --azure-key-vault-url "$(SignKeyVaultUrl)" `
-          --timestamp-url http://timestamp.digicert.com
-        displayName: Sign NuGet package
-        continueOnError: true
-        condition: >-
-          and(
-            succeeded(),
-            eq(variables['StartReleaseCandidate'], false),
-            not(startsWith(variables['Build.SourceBranch'], 'refs/tags/v'))
-          )
-
-      - task: PublishPipelineArtifact@1
-        displayName: Publish NuGet package
-        inputs:
-          targetPath: '$(Build.ArtifactStagingDirectory)'
-          artifactName: 'NuGetPackage'
-          artifactType: 'pipeline'
-      
-      - task: NuGetCommand@2
-        condition: >-
-          and(
-            succeeded(),
-            eq(variables['System.PullRequest.PullRequestId'], ''),
-            not(startsWith(variables['Build.SourceBranch'], 'refs/pull/')),
-            eq(variables['StartReleaseCandidate'], false),
-            not(startsWith(variables['Build.SourceBranch'], 'refs/tags/v'))
-          )
-        continueOnError: true
-        displayName: Push NuGet package to NuGet
-        inputs:
-          command: push
-          nuGetFeedType: external
-          allowPackageConflicts: true
-          packagesToPush: '$(Build.ArtifactStagingDirectory)/*.nupkg'
-          publishFeedCredentials: 'NuGet-$(System.TeamProject)'
-
+    - task: DotNetCoreCLI@2
+      displayName: Build SmokeTest
+      inputs:
+        command: 'build'
+        projects: 'test/SmokeTest/SmokeTest.csproj'
+        arguments: '--configuration $(buildConfiguration) --configfile "$(Build.SourcesDirectory)/test/SmokeTest/NuGet.Azdo.Config"'
+    
+    - task: NuGetCommand@2
+      condition: >-
+        and(
+          succeeded(),
+          eq(variables['System.PullRequest.PullRequestId'], ''),
+          not(startsWith(variables['Build.SourceBranch'], 'refs/pull/')),
+          eq(variables['StartReleaseCandidate'], false),
+          not(startsWith(variables['Build.SourceBranch'], 'refs/tags/v'))
+        )
+      continueOnError: true
+      displayName: Push NuGet package to NuGet
+      inputs:
+        command: push
+        nuGetFeedType: external
+        allowPackageConflicts: true
+        packagesToPush: '$(Build.ArtifactStagingDirectory)/*.nupkg'
+        publishFeedCredentials: 'NuGet-$(System.TeamProject)'
 
 # report build failure to Discord
 - stage: Report_Build_Failure
