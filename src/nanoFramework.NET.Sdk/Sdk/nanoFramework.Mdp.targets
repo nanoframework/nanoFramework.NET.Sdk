@@ -34,7 +34,7 @@
   <!--  Auto-inject MetadataProcessor package reference              -->
   <!-- ============================================================ -->
   <PropertyGroup>
-    <NanoFrameworkMDPVersion Condition="'$(NanoFrameworkMDPVersion)' == ''">4.0.0-preview.94</NanoFrameworkMDPVersion>
+    <NanoFrameworkMDPVersion Condition="'$(NanoFrameworkMDPVersion)' == ''">4.0.0-preview.98</NanoFrameworkMDPVersion>
   </PropertyGroup>
   <ItemGroup Condition="'$(NF_MDP_MSBUILDTASK_PATH)' == '' and '$(DisableNanoFrameworkMDP)' != 'true'">
     <PackageReference Include="nanoFramework.Tools.MetadataProcessor.MsBuildTask"
