@@ -20,7 +20,7 @@ Create an SDK-style project file (`.csproj`):
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="nanoFramework.CoreLibrary" Version="1.17.11" />
+    <PackageReference Include="nanoFramework.CoreLibrary" Version="2.0.0-preview.52" />
   </ItemGroup>
 
 </Project>
