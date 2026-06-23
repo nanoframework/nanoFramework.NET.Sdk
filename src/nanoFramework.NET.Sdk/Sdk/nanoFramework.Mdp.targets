@@ -34,8 +34,6 @@
   <!--  Auto-inject MetadataProcessor package reference              -->
   <!-- ============================================================ -->
   <PropertyGroup>
-    <!-- MDP 4.x emits the v2 PE format (NFMRK2) required by v2 firmware (3.0.x emits v1/NFMRK1).
-         4.x ships its task as net8.0 + net472 (not net6.0) — see _NfMdpTasksTFM below. -->
     <NanoFrameworkMDPVersion Condition="'$(NanoFrameworkMDPVersion)' == ''">4.0.0-preview.94</NanoFrameworkMDPVersion>
   </PropertyGroup>
   <ItemGroup Condition="'$(NF_MDP_MSBUILDTASK_PATH)' == '' and '$(DisableNanoFrameworkMDP)' != 'true'">
