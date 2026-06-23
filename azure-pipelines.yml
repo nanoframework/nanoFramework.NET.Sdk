@@ -65,7 +65,7 @@ stages:
         git config --global core.autocrlf true
       displayName: Setup git identity
 
-    - template: install-nbgv-tool.yml@templates
+    - template: azure-pipelines-templates/install-nbgv-tool.yml@templates
 
     # waiting for project to be public to enable SonarCloud analysis
     # - task: SonarCloudPrepare@3
@@ -88,7 +88,7 @@ stages:
     #       sonar.cs.vstest.reportsPaths=$(Agent.TempDirectory)/**/**.trx
     #       sonar.scanner.skipJreProvisioning=true
 
-    - template: install-nuget.yml@templates
+    - template: azure-pipelines-templates/install-nuget.yml@templates
 
     - task: DotNetCoreCLI@2
       displayName: Build
@@ -186,8 +186,8 @@ stages:
       displayName: Publish NuGet package
       inputs:
         targetPath: '$(Build.ArtifactStagingDirectory)'
-        artifact: 'NuGetPackage'
-        publishLocation: 'pipeline'
+        artifactName: 'NuGetPackage'
+        artifactType: pipeline
 
     - task: PowerShell@2
       displayName: Create NuGet config for SmokeTest
@@ -241,8 +241,7 @@ stages:
 
 # report build failure to Discord
 - stage: Report_Build_Failure
-  dependsOn:
-    - Build
+  dependsOn: Build
   condition: failed('Build')
 
   jobs:
