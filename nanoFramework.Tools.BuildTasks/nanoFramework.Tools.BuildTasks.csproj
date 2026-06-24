@@ -9,6 +9,12 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleToAttribute">
+      <_Parameter1>nanoFramework.Tools.BuildTasks.Tests</_Parameter1>
+    </AssemblyAttribute>
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="Microsoft.Build.Framework" Version="17.14.28" PrivateAssets="all" ExcludeAssets="runtime">
       <IncludeAssets>compile; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
@@ -17,37 +23,33 @@
     </PackageReference>
   </ItemGroup>
 
-  <!-- System.Drawing is needed for resource processing (bitmap handling in GenerateNanoResourceTask) -->
+  <!--
+    Resource processing (.resx -> .nanoresources) on .NET Framework uses GDI+ and
+    WinForms (System.Drawing / System.Windows.Forms ResXResourceReader).
+  -->
   <ItemGroup Condition="'$(TargetFramework)' == 'net472'">
     <Reference Include="System.Drawing" />
     <Reference Include="System.Windows.Forms" />
   </ItemGroup>
 
   <!--
-    Link source files from the VS extension repository.
-    During Phase 0, source lives in nf-Visual-Studio-extension.
-    Files will be migrated to this project in a later phase.
+    On modern .NET the GDI+ / WinForms dependencies are unavailable, so the resource
+    pipeline uses cross-platform equivalents (see ProcessResourceFiles.CrossPlatform.cs):
+      * SixLabors.ImageSharp for bitmap decoding / RGB565 conversion
+      * System.CodeDom for strongly-typed resource class generation
   -->
-
-  <!-- Tasks that compile cleanly on both net472 and net8.0 -->
-  <ItemGroup>
-    <Compile Remove="**\*.cs" />
-    <Compile Include="GenerateNanoResourceTask.Stub.cs" />
-    <Compile Include="..\..\nf-Visual-Studio-extension\Tools.BuildTasks-2019\GenerateBinaryOutputTask.cs" Link="GenerateBinaryOutputTask.cs" />
-    <Compile Include="..\..\nf-Visual-Studio-extension\Tools.BuildTasks-2019\ResolveRuntimeDependenciesTask.cs" Link="ResolveRuntimeDependenciesTask.cs" />
-    <Compile Include="..\..\nf-Visual-Studio-extension\Tools.BuildTasks-2019\TasksConstants.cs" Link="TasksConstants.cs" />
-    <Compile Include="..\..\nf-Visual-Studio-extension\Tools.BuildTasks-2019\Utilities\DebuggerHelper.cs" Link="Utilities\DebuggerHelper.cs" />
+  <ItemGroup Condition="'$(TargetFramework)' != 'net472'">
+    <PackageReference Include="SixLabors.ImageSharp" Version="3.1.11" />
+    <PackageReference Include="System.CodeDom" Version="8.0.0" />
   </ItemGroup>
 
   <!--
-    Resource processing tasks use APIs only available on .NET Framework
-    (AppDomain.CreateDomain, BinaryFormatter, ResXResourceReader, System.Drawing).
-    For net8.0, a stub implementation logs a warning. Full resource compilation
-    requires msbuild.exe / Visual Studio (net472).
+    The build task is loaded by MSBuild from the SDK package's tasks\ folder, so its
+    NuGet dependencies (ImageSharp, System.CodeDom) must sit next to the task DLL.
+    Copy them to the output so the packaging project can ship them.
   -->
-  <ItemGroup Condition="'$(TargetFramework)' == 'net472'">
-    <Compile Include="..\..\nf-Visual-Studio-extension\Tools.BuildTasks-2019\GenerateNanoResourceTask.cs" Link="GenerateNanoResourceTask.cs" />
-    <Compile Include="..\..\nf-Visual-Studio-extension\Tools.BuildTasks-2019\ProcessResourceFiles.cs" Link="ProcessResourceFiles.cs" />
-  </ItemGroup>
+  <PropertyGroup Condition="'$(TargetFramework)' != 'net472'">
+    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+  </PropertyGroup>
 
 </Project>

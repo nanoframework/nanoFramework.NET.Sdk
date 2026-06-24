@@ -1,0 +1,38 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net472</TargetFrameworks>
+    <RootNamespace>nanoFramework.Tools.BuildTasks.Tests</RootNamespace>
+    <AssemblyName>nanoFramework.Tools.BuildTasks.Tests</AssemblyName>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
+    <PackageReference Include="MSTest.TestAdapter" Version="3.6.3" />
+    <PackageReference Include="MSTest.TestFramework" Version="3.6.3" />
+    <!-- Microsoft.Build.Framework provides ITaskItem, IBuildEngine used in test infrastructure -->
+    <PackageReference Include="Microsoft.Build.Framework" Version="17.14.28" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\nanoFramework.Tools.BuildTasks\nanoFramework.Tools.BuildTasks.csproj" />
+  </ItemGroup>
+
+  <!--
+    net472 needs:
+      - Windows-only framework refs (same as the BuildTasks project)
+      - Microsoft.Build.Utilities.Core at runtime (provides the runtime lib for net472;
+        the net8.0 NuGet variant ships only a reference assembly, so ProcessResourceFilesTests
+        is guarded with #if NETFRAMEWORK and skipped on net8.0)
+  -->
+  <ItemGroup Condition="'$(TargetFramework)' == 'net472'">
+    <Reference Include="System.Drawing" />
+    <Reference Include="System.Windows.Forms" />
+    <PackageReference Include="Microsoft.Build.Utilities.Core" Version="17.14.28" />
+  </ItemGroup>
+
+</Project>

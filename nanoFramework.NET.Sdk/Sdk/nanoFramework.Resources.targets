@@ -28,15 +28,61 @@
              Condition="'$(NF_MSBUILDTASK_PATH)' != ''"
              AssemblyFile="$(NF_MSBUILDTASK_PATH)\nanoFramework.Tools.BuildTasks.dll" />
 
+  <!--
+    Suppress the standard resource pipeline for nanoFramework .resx items.
+
+    The standard CoreResGen target (Microsoft.Common.CurrentVersion.targets) runs the
+    GenerateResource task, which rejects non-string resources (bitmaps, binary blobs)
+    unless the project references System.Resources.Extensions — an assembly that does
+    not exist in the nanoFramework BCL, and whose .resources output nanoFramework never
+    consumes anyway (the MetadataProcessor imports our .nanoresources directly, see
+    nanoFramework.Mdp.targets ImportResources).
+
+    We move the .resx items out of @(EmbeddedResource) into the private @(_NanoResxItems)
+    before CoreResGen runs, so the standard task never sees them 
+    (no MSB3822/MSB3823, no dead .resources in the IL).
+    NanoGenerateResources then converts @(_NanoResxItems) into .nanoresources.
+
+    Runs before CoreResGen (so the items are gone by the time it executes) but after
+    PrepareResourceNames (so %(ManifestResourceName) is already assigned for the
+    output path below).
+  -->
+  <Target Name="_NanoInterceptResxItems" BeforeTargets="CoreResGen">
+    <ItemGroup>
+      <_NanoResxItems Include="@(EmbeddedResource)"
+                      Condition="'%(EmbeddedResource.Type)' == 'Resx'" />
+      <EmbeddedResource Remove="@(_NanoResxItems)" />
+    </ItemGroup>
+  </Target>
+
+  <!--
+    Emit a build error when .resx resources are present but the project does not
+    reference nanoFramework.ResourceManager.
+
+    Set $(NanoSkipResourceManagerCheck) = true to suppress this error (e.g., in the
+    nanoFramework.ResourceManager package itself or any framework-level project that
+    provides resources without taking a self-reference).
+  -->
+  <Target Name="_NanoCheckResourceManagerRef"
+          Condition="'@(_NanoResxItems)' != '' AND '$(NanoSkipResourceManagerCheck)' != 'true'">
+    <ItemGroup>
+      <_NanoResManagerRef Include="@(PackageReference)"
+                          Condition="'%(Identity)' == 'nanoFramework.ResourceManager'" />
+    </ItemGroup>
+    <Error Condition="'@(_NanoResManagerRef)' == ''"
+           Code="NFSDK0002"
+           Text="Projects that include .resx resources require a reference to the 'nanoFramework.ResourceManager' NuGet package. Add &lt;PackageReference Include=&quot;nanoFramework.ResourceManager&quot; /&gt; to your project file, or set &lt;NanoSkipResourceManagerCheck&gt;true&lt;/NanoSkipResourceManagerCheck&gt; to suppress this check." />
+  </Target>
+
   <Target Name="NanoGenerateResources"
-          Condition="'@(EmbeddedResource)' != ''">
+          DependsOnTargets="_NanoInterceptResxItems;_NanoCheckResourceManagerRef">
     <GenerateNanoResourceTask
-        Sources="@(EmbeddedResource)"
-        Condition="'%(EmbeddedResource.Type)' == 'Resx' and '%(EmbeddedResource.GenerateResource)' != 'false'"
+        Condition="'@(_NanoResxItems)' != ''"
+        Sources="@(_NanoResxItems)"
         References="@(ReferencePath)"
         UseSourcePath="$(UseSourcePath)"
         StateFile="$(IntermediateOutputPath)$(MSBuildProjectFile).NanoGenerateResources.Cache"
-        OutputResources="@(EmbeddedResource->'$(IntermediateOutputPath)%(ManifestResourceName).nanoresources')">
+        OutputResources="@(_NanoResxItems->'$(IntermediateOutputPath)%(ManifestResourceName).nanoresources')">
       <Output TaskParameter="OutputResources" ItemName="_NanoResources" />
       <Output TaskParameter="FilesWritten" ItemName="FileWrites" />
     </GenerateNanoResourceTask>
