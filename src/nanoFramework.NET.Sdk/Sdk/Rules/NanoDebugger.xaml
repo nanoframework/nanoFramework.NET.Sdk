@@ -14,11 +14,6 @@
                 Default="$(TargetPath)"
                 Description="The debug command to execute.">
         <StringProperty.ValueEditors>
-            <ValueEditor EditorType="DefaultFindFullPathPropertyEditor" DisplayName="&lt;regsvr32.exe&gt;">
-                <ValueEditor.Metadata>
-                    <NameValuePair Name="Exename" Value="regsvr32.exe" />
-                </ValueEditor.Metadata>
-            </ValueEditor>
             <ValueEditor EditorType="DefaultStringPropertyEditor" DisplayName="&lt;Edit...&gt;"/>
             <ValueEditor EditorType="DefaultFilePropertyEditor" DisplayName="&lt;Browse...&gt;">
                 <ValueEditor.Metadata>
