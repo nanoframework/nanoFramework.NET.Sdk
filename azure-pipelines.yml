@@ -119,6 +119,29 @@ stages:
     #   displayName: 'Publish Quality Gate Result'
     #   continueOnError: true
 
+    - task: VisualStudioTestPlatformInstaller@1
+      condition: succeeded()
+      displayName: 'Install VS Test Platform'
+      inputs:
+        versionSelector: latestStable
+
+    - task: VSTest@2
+      condition: succeeded()
+      displayName: 'Running Unit Tests'
+      continueOnError: false
+      inputs:
+        testSelector: 'testAssemblies'
+        testAssemblyVer2: |
+          **\*Tests*.dll
+          !**\obj\**
+          !**\TestAdapter\**
+        searchFolder: '$(System.DefaultWorkingDirectory)'
+        platform: '$(BuildPlatform)'
+        configuration: '$(BuildConfiguration)'
+        diagnosticsEnabled: true
+        vsTestVersion: toolsInstaller
+        codeCoverageEnabled: true
+
     - task: DotNetCoreCLI@2
       displayName: Install Sign Client CLI
       condition: >-
@@ -220,6 +243,22 @@ stages:
         command: 'build'
         projects: 'test/SmokeTest/SmokeTest.csproj'
         arguments: '--configuration $(buildConfiguration) --no-restore'
+
+    - task: PowerShell@2
+      displayName: Validate SmokeTest native checksum
+      inputs:
+        targetType: inline
+        script: |
+          $expectedChecksum = '0x1DA81E42'
+          $actualChecksum = $env:NF_NATIVE_ASSEMBLY_CHECKSUM
+
+          if ($actualChecksum -ine $expectedChecksum)
+          {
+            Write-Host "##vso[task.logissue type=error]Smoke test assembly checksum mismatch: expected $expectedChecksum but got '$actualChecksum'."
+            exit 1
+          }
+
+          Write-Host "Smoke test assembly checksum matches expected value: $expectedChecksum."
     
     - task: NuGetCommand@2
       condition: >-

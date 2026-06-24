@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  SmokeTest resources — exercises the .resx -> .nanoresources pipeline across both
+  build-task target frameworks (net472 via msbuild.exe / VS, net8.0 via dotnet build).
+  The produced .nanoresources is verified byte-for-byte identical between the two.
+
+  NOTE on the bitmap: logo.bmp deliberately uses only fully-saturated channel values
+  (0 / 255). GDI+ (the net472 System.Drawing path) applies ordered (Bayer) dithering
+  when quantizing 24bpp -> 16bpp RGB565, while the net8.0 ImageSharp path does flat
+  round-to-nearest. Colors that land exactly on a 5/6-bit half-level boundary would
+  therefore differ by 1 LSB between the two builds. Pure 0/255 colors quantize exactly
+  on both paths, keeping this a strict byte-parity gate. See
+  ProcessResourceFiles.CrossPlatform.cs (ConvertToRgb565) for details.
+-->
+<root>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+
+  <!-- string resources -->
+  <data name="WelcomeString">
+    <value>Hello .NET nanoFramework!</value>
+  </data>
+  <data name="VersionString">
+    <value>v1.0.0</value>
+  </data>
+
+  <!-- bitmap (BMP file reference — resolved relative to this .resx when UseSourcePath=true) -->
+  <data name="LogoBitmap" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>logo.bmp;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </data>
+
+  <!-- binary blob (raw byte[] file reference — the portable way to embed binary data;
+       resolved relative to this .resx when UseSourcePath=true) -->
+  <data name="BinaryData" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>data.bin;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </data>
+
+</root>
