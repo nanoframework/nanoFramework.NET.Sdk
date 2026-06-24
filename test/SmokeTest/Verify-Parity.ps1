@@ -80,10 +80,7 @@ function Build-And-CaptureNanoResources {
     }
 
     $resourceFiles = @(Get-ChildItem -LiteralPath $resourceDirectory -Filter '*.nanoresources' -File)
-    if ($exitCode -ne 0 -and $resourceFiles.Count -gt 0) {
-        Write-Warning "$Toolchain build returned exit code $exitCode, but .nanoresources files were generated. Continuing parity check."
-    }
-    elseif ($exitCode -ne 0) {
+    if ($exitCode -ne 0) {
         throw "$Toolchain build failed with exit code $exitCode."
     }
 
