@@ -1,10 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!--Copyright, Microsoft Corporation, All rights reserved.-->
+<!--
+Copyright (c) .NET Foundation and Contributors.
+Partial Copyright, Microsoft Corporation, All rights reserved.
+See LICENSE file in the project root for full license information.
+-->
 <Rule
 	Name="NanoDebugger"
 	DisplayName=".NET nanoFramework Device"
 	PageTemplate="debugger"
-	Description="NanoDebugger Debugger options"
+	Description=".NET nanoFramework Device debugger options"
 	xmlns="http://schemas.microsoft.com/build/2009/properties">
     <Rule.DataSource>
         <DataSource Persistence="UserFileWithXamlDefaults" />
