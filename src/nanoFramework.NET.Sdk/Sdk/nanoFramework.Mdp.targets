@@ -50,28 +50,6 @@
   </ItemGroup>
 
   <!-- ============================================================ -->
-  <!--  Guard: this SDK targets v2 firmware (NFMRK2 + generics).     -->
-  <!--  A v1 MDP (3.x / NFMRK1) cannot represent generics, so a      -->
-  <!--  v1 pin would silently emit assemblies that won't load on     -->
-  <!--  v2 firmware. Fail loudly at MDP time instead. Skipped when   -->
-  <!--  MDP is disabled or a task path is supplied out-of-band       -->
-  <!--  (version unknown in that case).                              -->
-  <!-- ============================================================ -->
-  <Target Name="_NanoCheckMdpRuntimeVersion"
-          BeforeTargets="MetaDataProcessor;MetaDataProcessorCompile"
-          Condition="'$(DisableNanoFrameworkMDP)' != 'true' and '$(NF_MDP_MSBUILDTASK_PATH)' == ''">
-    <!-- Strip any prerelease suffix (e.g. -preview.98) so VersionLessThan, which parses
-         System.Version, does not choke on the tag. -->
-    <PropertyGroup>
-      <_NanoMdpVersionCore>$(NanoFrameworkMDPVersion)</_NanoMdpVersionCore>
-      <_NanoMdpVersionCore Condition="$(_NanoMdpVersionCore.Contains('-'))">$(_NanoMdpVersionCore.Substring(0, $(_NanoMdpVersionCore.IndexOf('-'))))</_NanoMdpVersionCore>
-    </PropertyGroup>
-    <Error Condition="$([MSBuild]::VersionLessThan('$(_NanoMdpVersionCore)', '4.0.0'))"
-           Code="NFSDK001"
-           Text="This nanoFramework SDK targets v2 firmware (NFMRK2 / generics). MetadataProcessor '$(NanoFrameworkMDPVersion)' emits the v1 (NFMRK1) format and cannot represent generics. Pin 'NanoFrameworkMDPVersion' to 4.0.0 or newer, or use an earlier nanoFramework.NET.Sdk version for v1 firmware." />
-  </Target>
-
-  <!-- ============================================================ -->
   <!--  Metadata Processor defaults (depend on NanoIsCoreLibrary)    -->
   <!--  NanoIsCoreLibrary is set in the project file, so these are   -->
   <!--  in a targets-time module (after Sdk.props).                  -->
