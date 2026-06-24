@@ -72,7 +72,6 @@ stages:
     #   condition: >-
     #     and(
     #       succeeded(),
-    #       eq(variables['StartReleaseCandidate'], false),
     #       not(startsWith(variables['Build.SourceBranch'], 'refs/tags/v')),
     #       not(${{ parameters.skipSonarCloudAnalysis }})
     #     )
@@ -102,7 +101,6 @@ stages:
     #   condition: >-
     #     and(
     #       succeeded(),
-    #       eq(variables['StartReleaseCandidate'], false),
     #       not(startsWith(variables['Build.SourceBranch'], 'refs/tags/v'))
     #     )
     #   displayName: 'Run Code Analysis'
@@ -113,7 +111,6 @@ stages:
     #   condition: >-
     #     and(
     #       succeeded(),
-    #       eq(variables['StartReleaseCandidate'], false),
     #       not(startsWith(variables['Build.SourceBranch'], 'refs/tags/v'))
     #     )
     #   displayName: 'Publish Quality Gate Result'
@@ -147,7 +144,6 @@ stages:
       condition: >-
         and(
           succeeded(),
-          eq(variables['StartReleaseCandidate'], false),
           not(startsWith(variables['Build.SourceBranch'], 'refs/tags/v'))
         )
       inputs:
@@ -172,7 +168,6 @@ stages:
       condition: >-
         and(
           succeeded(),
-          eq(variables['StartReleaseCandidate'], false),
           not(startsWith(variables['Build.SourceBranch'], 'refs/tags/v'))
         )
 
@@ -201,8 +196,7 @@ stages:
       condition: >-
         and(
           succeeded(),
-          eq(variables['StartReleaseCandidate'], false),
-          not(startsWith(variables['Build.SourceBranch'], 'refs/tags/v'))
+          eq(variables['System.PullRequest.PullRequestId'], '')
         )
 
     - task: PublishPipelineArtifact@1
@@ -264,10 +258,7 @@ stages:
       condition: >-
         and(
           succeeded(),
-          eq(variables['System.PullRequest.PullRequestId'], ''),
-          not(startsWith(variables['Build.SourceBranch'], 'refs/pull/')),
-          eq(variables['StartReleaseCandidate'], false),
-          not(startsWith(variables['Build.SourceBranch'], 'refs/tags/v'))
+          eq(variables['System.PullRequest.PullRequestId'], '')
         )
       continueOnError: true
       displayName: Push NuGet package to NuGet
