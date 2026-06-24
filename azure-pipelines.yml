@@ -153,8 +153,8 @@ stages:
 
     - pwsh: |
         .\sign code azure-key-vault `
-        "**/nanoFramework.Tools.BuildTasks.*" `
-        --base-directory "$(Build.SourcesDirectory)/nanoFramework.NET.Sdk/build/Release" `
+        "*/bin/$(buildConfiguration)/**/nanoFramework.*.dll" `
+        --base-directory "$(Build.SourcesDirectory)" `
         --description "$(Build.Repository.Name)" `
         --description-url "https://github.com/$(Build.Repository.Name)" `
         --azure-key-vault-tenant-id "$(SignTenantId)" `
