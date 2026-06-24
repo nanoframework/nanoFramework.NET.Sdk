@@ -65,8 +65,6 @@ stages:
         git config --global core.autocrlf true
       displayName: Setup git identity
 
-    - template: azure-pipelines-templates/install-nbgv-tool.yml@templates
-
     # waiting for project to be public to enable SonarCloud analysis
     # - task: SonarCloudPrepare@3
     #   condition: >-
@@ -173,6 +171,7 @@ stages:
 
     - task: DotNetCoreCLI@2
       displayName: Pack
+      condition: succeeded()
       inputs:
         command: 'pack'
         packagesToPack: '**/nanoFramework.NET.Sdk.csproj'
@@ -228,7 +227,14 @@ stages:
             throw "Couldn't infer SDK version from package '$($sdkPackage.Name)'."
           }
 
-          $sdkVersion = $match.Groups[1].Value
+          # Use the nbgv CLI to get the authoritative NuGet package version.
+          $sdkVersion = (& nbgv get-version --public-release -v NuGetPackageVersion).Trim()
+
+          if ([string]::IsNullOrWhiteSpace($sdkVersion))
+          {
+            throw "Couldn't determine SDK version via 'nbgv get-version'."
+          }
+
           Write-Host "Using SmokeTest SDK package: $($sdkPackage.Name)"
           Write-Host "Using SmokeTest SDK version: $sdkVersion"
 
@@ -271,11 +277,20 @@ stages:
         nugetConfigPath: '$(Build.SourcesDirectory)/test/SmokeTest/NuGet.Azdo.Config'
 
     - task: DotNetCoreCLI@2
-      displayName: Build SmokeTest
+      displayName: Build SmokeTest (dotnet build)
       inputs:
         command: 'build'
         projects: 'test/SmokeTest/SmokeTest.csproj'
         arguments: '--configuration $(buildConfiguration) --no-restore'
+
+    - task: VSBuild@1
+      displayName: Build SmokeTest (MSBuild)
+      inputs:
+        solution: 'test/SmokeTest/SmokeTest.csproj'
+        platform: '$(buildPlatform)'
+        configuration: '$(buildConfiguration)'
+        vsVersion: 'latest'
+        msbuildArgs: '/t:Build /p:Restore=false'
 
     - task: PowerShell@2
       displayName: Validate SmokeTest native checksum
@@ -292,6 +307,13 @@ stages:
           }
 
           Write-Host "Smoke test assembly checksum matches expected value: $expectedChecksum."
+
+    - task: PowerShell@2
+      displayName: Validate SmokeTest resource parity
+      inputs:
+        targetType: filePath
+        filePath: 'test/SmokeTest/Verify-Parity.ps1'
+        arguments: '-Configuration $(buildConfiguration)'
     
     - task: NuGetCommand@2
       condition: >-
