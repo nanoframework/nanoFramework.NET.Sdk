@@ -29,13 +29,6 @@
     <!-- Disable .NET framework reference resolution — nanoFramework has its own mscorlib -->
     <DisableImplicitFrameworkReferences>true</DisableImplicitFrameworkReferences>
 
-    <!--
-      Existing nanoFramework NuGet packages place files in a flat lib\ directory
-      (no TFM subfolder). NuGet interprets those as ".NETFramework,Version=v0.0".
-      AssetTargetFallback tells NuGet: if no netnano1.0 assets exist, accept "net" assets.
-    -->
-    <AssetTargetFallback Condition="'$(AssetTargetFallback)' == ''">net</AssetTargetFallback>
-
     <!-- Suppress NU1701 warning for the expected fallback -->
     <NoWarn>$(NoWarn);NU1701</NoWarn>
   </PropertyGroup>
