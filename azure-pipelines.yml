@@ -227,7 +227,14 @@ stages:
             throw "Couldn't infer SDK version from package '$($sdkPackage.Name)'."
           }
 
-          $sdkVersion = $match.Groups[1].Value
+          # Use the nbgv CLI to get the authoritative NuGet package version.
+          $sdkVersion = (& nbgv get-version --public-release -v NuGetPackageVersion).Trim()
+
+          if ([string]::IsNullOrWhiteSpace($sdkVersion))
+          {
+            throw "Couldn't determine SDK version via 'nbgv get-version'."
+          }
+
           Write-Host "Using SmokeTest SDK package: $($sdkPackage.Name)"
           Write-Host "Using SmokeTest SDK version: $sdkVersion"
 
