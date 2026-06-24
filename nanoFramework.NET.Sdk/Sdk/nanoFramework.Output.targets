@@ -47,7 +47,7 @@
   <!-- ============================================================ -->
   <Target Name="NanoGenerateBinaryOutput"
           AfterTargets="GenerateNanoPeFile"
-          Condition="'$(DisableNanoMdp)' != 'true' and '$(NanoIsCoreLibrary)' != 'True'"
+          Condition="'$(NanoIsCoreLibrary)' != 'True'"
           DependsOnTargets="ResolveReferences">
     <GenerateBinaryOutputTask
         AssemblyPE="$(_NanoMdpCompileOutput)"
@@ -87,8 +87,7 @@
   <!--  Copy targets (run after the standard output copy)           -->
   <!-- ============================================================ -->
   <Target Name="NanoCopyOutputFiles"
-          AfterTargets="CopyFilesToOutputDirectory"
-          Condition="'$(DisableNanoMdp)' != 'true'">
+          AfterTargets="CopyFilesToOutputDirectory">
     <Copy Condition="Exists('$(_NanoIntermediateAssembly).pe')"
           SourceFiles="$(_NanoIntermediateAssembly).pe"
           DestinationFiles="$(_NanoOutputAssembly).pe" SkipUnchangedFiles="true">
@@ -112,8 +111,7 @@
   </Target>
 
   <Target Name="_NanoCopyReferencesToIntermediate"
-          AfterTargets="CopyFilesToOutputDirectory"
-          Condition="'$(DisableNanoMdp)' != 'true'">
+          AfterTargets="CopyFilesToOutputDirectory">
     <Copy SourceFiles="@(ReferenceCopyLocalPaths)"
           DestinationFiles="@(ReferenceCopyLocalPaths->'$(IntermediateOutputPath)%(Filename)%(Extension)')"
           SkipUnchangedFiles="false">

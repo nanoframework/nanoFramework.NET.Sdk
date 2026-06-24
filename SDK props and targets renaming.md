@@ -95,7 +95,6 @@ renames are local — except the external contracts listed in "Do NOT rename" be
 | Current | Proposed | Alias kept? |
 |---|---|---|
 | `NanoFrameworkMDPVersion` | `NanoMdpVersion` | yes |
-| `DisableNanoFrameworkMDP` | `DisableNanoMdp` | yes |
 | `NanoIsCoreLibrary` | unchanged | — |
 | `NanoGenerateStubsDirectory` / `…StubsRootName` / `…SkeletonProjectName` / `…SkeletonFile` | unchanged (already on-convention) | — |
 
@@ -156,8 +155,7 @@ so an existing `.csproj` setting still wins:
 ```
 
 Same shape for `NanoMdpVerboseMinimize` ← `NFMDP_PE_VerboseMinimize`, `NanoMdpVersion` ←
-`NanoFrameworkMDPVersion`, `DisableNanoMdp` ← `DisableNanoFrameworkMDP`, and `NanoIsCoreLibrary` ←
-`IsCoreAssembly`.
+`NanoFrameworkMDPVersion` and `NanoIsCoreLibrary` ← `IsCoreAssembly`.
 
 ## Files touched
 

@@ -40,15 +40,6 @@
   -->
 
   <!-- ============================================================ -->
-  <!--  Back-compat aliases for renamed user-facing knobs           -->
-  <!--  (seed the new property from the legacy name before defaults -->
-  <!--   are applied, so an existing .csproj setting still wins)    -->
-  <!-- ============================================================ -->
-  <PropertyGroup>
-    <DisableNanoMdp Condition="'$(DisableNanoMdp)' == '' and '$(DisableNanoFrameworkMDP)' != ''">$(DisableNanoFrameworkMDP)</DisableNanoMdp>
-  </PropertyGroup>
-
-  <!-- ============================================================ -->
   <!--  Metadata Processor defaults (project-independent)           -->
   <!-- ============================================================ -->
   <PropertyGroup>
@@ -72,7 +63,7 @@
     <NanoMdpVersion Condition="'$(NanoMdpVersion)' == '' and '$(NanoFrameworkMDPVersion)' != ''">$(NanoFrameworkMDPVersion)</NanoMdpVersion>
     <NanoMdpVersion Condition="'$(NanoMdpVersion)' == ''">4.0.0-preview.98</NanoMdpVersion>
   </PropertyGroup>
-  <ItemGroup Condition="'$(NF_MDP_MSBUILDTASK_PATH)' == '' and '$(DisableNanoMdp)' != 'true'">
+  <ItemGroup Condition="'$(NF_MDP_MSBUILDTASK_PATH)' == ''">
     <PackageReference Include="nanoFramework.Tools.MetadataProcessor.MsBuildTask"
                       Version="$(NanoMdpVersion)"
                       PrivateAssets="all"
@@ -133,7 +124,7 @@
     <_NanoMdpTasksTfm Condition="'$(MSBuildRuntimeType)' == 'Core'">net8.0</_NanoMdpTasksTfm>
     <_NanoMdpTasksTfm Condition="'$(_NanoMdpTasksTfm)' == ''">net472</_NanoMdpTasksTfm>
     <!-- Resolve MDP task directory from NuGet package using GeneratePathProperty -->
-    <_NanoMdpTasksDir Condition="'$(NF_MDP_MSBUILDTASK_PATH)' == '' and '$(DisableNanoMdp)' != 'true' and '$(PkgnanoFramework_Tools_MetadataProcessor_MsBuildTask)' != ''">$(PkgnanoFramework_Tools_MetadataProcessor_MsBuildTask)\lib\$(_NanoMdpTasksTfm)\</_NanoMdpTasksDir>
+    <_NanoMdpTasksDir Condition="'$(NF_MDP_MSBUILDTASK_PATH)' == '' and '$(PkgnanoFramework_Tools_MetadataProcessor_MsBuildTask)' != ''">$(PkgnanoFramework_Tools_MetadataProcessor_MsBuildTask)\lib\$(_NanoMdpTasksTfm)\</_NanoMdpTasksDir>
     <_NanoMdpTasksDir Condition="'$(NF_MDP_MSBUILDTASK_PATH)' != ''">$(NF_MDP_MSBUILDTASK_PATH)\</_NanoMdpTasksDir>
   </PropertyGroup>
 
@@ -219,7 +210,6 @@
   <!--  incrementality on every project.                            -->
   <!-- ============================================================ -->
   <Target Name="GenerateNanoPeFile"
-          Condition="'$(DisableNanoMdp)' != 'true'"
           AfterTargets="CoreCompile"
           DependsOnTargets="ResolveReferences;ResolveRuntimeDependencies;NanoGenerateResources"
           Inputs="$(_NanoMdpParseInput);@(ReferencePath);@(ReferenceDependencyPaths);@(_NanoResources)"
