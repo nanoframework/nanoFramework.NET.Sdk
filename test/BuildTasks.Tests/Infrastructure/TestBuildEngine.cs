@@ -41,7 +41,7 @@ namespace nanoFramework.Tools.BuildTasks.Tests.Infrastructure
     /// </summary>
     internal sealed class TestTask : ITask
     {
-        public IBuildEngine BuildEngine { get; set; } = null!;
+        public IBuildEngine BuildEngine { get; set; } = new TestBuildEngine();
         public ITaskHost? HostObject { get; set; }
         public bool Execute() => true;
     }

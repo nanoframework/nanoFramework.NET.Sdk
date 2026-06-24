@@ -138,7 +138,7 @@ namespace nanoFramework.Tools
             {
                 if (!ProcessFile(inFiles[i], outFiles[i]))
                 {
-                    UnsuccessfullyCreatedOutFiles.Add(outFiles[i]);
+                    UnsuccessfullyCreatedOutFiles.Add(outFiles[i].ItemSpec);
                 }
             }
         }
@@ -1841,6 +1841,12 @@ namespace nanoFramework.Tools
                     Resource resource = resources[iResource];
 
                     resource.header.Serialize(writer);
+                }
+
+                for (int iResource = 0; iResource < resources.Length; iResource++)
+                {
+                    Resource resource = resources[iResource];
+
                     writer.Write(resource.data);
                 }
             }
@@ -1863,6 +1869,14 @@ namespace nanoFramework.Tools
 
                     resources[iResource] = resource;
                     resource.header.Deserialize(reader);
+                }
+
+                reader.BaseStream.Position = header.OffsetOfResourceData;
+
+                for (int iResource = 0; iResource < resources.Length; iResource++)
+                {
+                    Resource resource = resources[iResource];
+
                     resource.data = reader.ReadBytes((int)resource.header.size);
                 }
             }
@@ -2109,7 +2123,7 @@ namespace nanoFramework.Tools
                     file.AddResource(new NanoResourceFile.Resource(resource, data));
                 }
 
-                using (FileStream fileStream = File.Open(fileName, FileMode.OpenOrCreate))
+                using (FileStream fileStream = File.Open(fileName, FileMode.Create))
                 {
                     BinaryWriter writer = new BinaryWriter(fileStream);
                     file.Serialize(writer);

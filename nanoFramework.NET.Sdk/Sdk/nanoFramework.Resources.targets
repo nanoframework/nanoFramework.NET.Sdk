@@ -75,9 +75,9 @@
   </Target>
 
   <Target Name="NanoGenerateResources"
-          Condition="'@(_NanoResxItems)' != ''"
           DependsOnTargets="_NanoInterceptResxItems;_NanoCheckResourceManagerRef">
     <GenerateNanoResourceTask
+        Condition="'@(_NanoResxItems)' != ''"
         Sources="@(_NanoResxItems)"
         References="@(ReferencePath)"
         UseSourcePath="$(UseSourcePath)"

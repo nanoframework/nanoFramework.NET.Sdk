@@ -47,9 +47,9 @@ namespace nanoFramework.Tools
             FileWritten = null;
 
             // get paths for PE files
-            // rename extension .dll with .pe
-            List<string> peCollection = new List<string>();
-            peCollection = AssemblyReferences?.Select(a => { return a.GetMetadata("FullPath").Replace(".dll", ".pe").Replace(".exe", ".pe"); }).ToList();
+            List<string> peCollection = AssemblyReferences?
+                .Select(a => Path.ChangeExtension(a.GetMetadata("FullPath"), ".pe"))
+                .ToList() ?? new List<string>();
 
             // add executable PE
             peCollection.Add(AssemblyPE);
@@ -68,8 +68,20 @@ namespace nanoFramework.Tools
                     {
                         long length = (fs.Length + 3) / 4 * 4;
                         byte[] buffer = new byte[length];
+                        int fileLength = (int)fs.Length;
+                        int totalRead = 0;
 
-                        fs.Read(buffer, 0, (int)fs.Length);
+                        while (totalRead < fileLength)
+                        {
+                            int bytesRead = fs.Read(buffer, totalRead, fileLength - totalRead);
+
+                            if (bytesRead == 0)
+                            {
+                                throw new EndOfStreamException($"Unexpected end of file while reading '{peItem}'.");
+                            }
+
+                            totalRead += bytesRead;
+                        }
 
                         // copy this assembly to the bin file too
                         binFile.Write(buffer, 0, (int)length);

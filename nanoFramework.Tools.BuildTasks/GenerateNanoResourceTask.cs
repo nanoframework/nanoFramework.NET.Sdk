@@ -844,7 +844,11 @@ namespace nanoFramework.Tools
                     AssemblyName[] assemblyList;
                     try
                     { //only load system.drawing, mscorlib.  no parameters needed here?!!
+#if NETFRAMEWORK
                         assemblyList = LoadReferences();
+#else
+                        assemblyList = Array.Empty<AssemblyName>();
+#endif
                     }
                     catch (ArgumentException e)
                     {

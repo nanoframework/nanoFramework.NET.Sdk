@@ -27,8 +27,8 @@ namespace nanoFramework.Tools.BuildTasks.Tests
     /// These tests use the public <c>ReadResources</c> / <c>WriteResources</c> API
     /// rather than <c>Run()</c> so that the test project has no runtime dependency on
     /// <c>Microsoft.Build.Utilities.Core</c> (whose assembly is not on the default
-    /// probe path when running <c>dotnet test</c>). Both TFMs (net8.0 and net472) are
-    /// exercised.
+    /// probe path when running <c>dotnet test</c>). This file is compiled and run only
+    /// for NETFRAMEWORK (net472).
     /// </summary>
     [TestClass]
     public class ProcessResourceFilesTests
