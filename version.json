@@ -11,10 +11,15 @@
   "publicReleaseRefSpec": [
     "^refs/heads/develop$",
     "^refs/heads/main$",
-    "^refs/heads/v\\d+(?:\\.\\d+)?$",
-    "^refs/pull/\\d+/merge$"
+    "^refs/heads/v\\d+(?:\\.\\d+)?$"
   ],
   "cloudBuild": {
-    "setAllVariables": true
+    "setAllVariables": true,
+    "buildNumber": {
+      "enabled": true,
+      "includeCommitId": {
+        "when": "never"
+      }
+    }
   }
 }
