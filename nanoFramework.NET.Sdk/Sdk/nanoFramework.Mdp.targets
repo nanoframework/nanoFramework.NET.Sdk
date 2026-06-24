@@ -18,7 +18,8 @@
 
     Holds:
       - the auto-injected MDP PackageReference + NanoMdpVersion default,
-      - the MDP property defaults (verbosity, NanoIsCoreLibrary-driven switches),
+      - the MDP property defaults (verbosity, public NanoMdp* knobs, and
+        NanoIsCoreLibrary-driven internal switches),
       - the _NanoMdpTasksTfm / task-DLL resolution and UsingTask declarations,
       - the single GenerateNanoPeFile target that emits the .pe / .pdbx (and, for
         core assemblies, the stubs / dump-exports / dependency-map / strings).
@@ -78,16 +79,16 @@
   <!--  in a targets-time module (after Sdk.props).                 -->
   <!-- ============================================================ -->
   <PropertyGroup Condition="'$(NanoIsCoreLibrary)' == 'True'">
-    <_NanoMdpDumpMetadata Condition="'$(_NanoMdpDumpMetadata)' == ''">true</_NanoMdpDumpMetadata>
-    <_NanoMdpGenerateStubs Condition="'$(_NanoMdpGenerateStubs)' == ''">true</_NanoMdpGenerateStubs>
-    <_NanoMdpGenerateDatFiles Condition="'$(_NanoMdpGenerateDatFiles)' == ''">true</_NanoMdpGenerateDatFiles>
-    <_NanoMdpGenerateXmlFiles Condition="'$(_NanoMdpGenerateXmlFiles)' == ''">true</_NanoMdpGenerateXmlFiles>
+    <NanoMdpDumpMetadata Condition="'$(NanoMdpDumpMetadata)' == ''">true</NanoMdpDumpMetadata>
+    <NanoMdpGenerateStubs Condition="'$(NanoMdpGenerateStubs)' == ''">true</NanoMdpGenerateStubs>
+    <NanoMdpGenerateDatFiles Condition="'$(NanoMdpGenerateDatFiles)' == ''">true</NanoMdpGenerateDatFiles>
+    <NanoMdpGenerateXmlFiles Condition="'$(NanoMdpGenerateXmlFiles)' == ''">true</NanoMdpGenerateXmlFiles>
   </PropertyGroup>
   <PropertyGroup Condition="'$(NanoIsCoreLibrary)' != 'True'">
-    <_NanoMdpDumpMetadata Condition="'$(_NanoMdpDumpMetadata)' == ''">false</_NanoMdpDumpMetadata>
-    <_NanoMdpGenerateStubs Condition="'$(_NanoMdpGenerateStubs)' == ''">false</_NanoMdpGenerateStubs>
-    <_NanoMdpGenerateDatFiles Condition="'$(_NanoMdpGenerateDatFiles)' == ''">false</_NanoMdpGenerateDatFiles>
-    <_NanoMdpGenerateXmlFiles Condition="'$(_NanoMdpGenerateXmlFiles)' == ''">false</_NanoMdpGenerateXmlFiles>
+    <NanoMdpDumpMetadata Condition="'$(NanoMdpDumpMetadata)' == ''">false</NanoMdpDumpMetadata>
+    <NanoMdpGenerateStubs Condition="'$(NanoMdpGenerateStubs)' == ''">false</NanoMdpGenerateStubs>
+    <NanoMdpGenerateDatFiles Condition="'$(NanoMdpGenerateDatFiles)' == ''">false</NanoMdpGenerateDatFiles>
+    <NanoMdpGenerateXmlFiles Condition="'$(NanoMdpGenerateXmlFiles)' == ''">false</NanoMdpGenerateXmlFiles>
   </PropertyGroup>
 
   <!-- ============================================================ -->
@@ -157,7 +158,7 @@
     <_NanoMdpCompileOutput>$(_NanoIntermediateAssembly).pe</_NanoMdpCompileOutput>
     <_NanoMdpCompileOutputNoExt>$(_NanoIntermediateAssembly)</_NanoMdpCompileOutputNoExt>
 
-    <!-- Stub/skeleton inputs (consumed by the task only when _NanoMdpGenerateStubs == true) -->
+    <!-- Stub/skeleton inputs (consumed by the task only when NanoMdpGenerateStubs == true) -->
     <_NanoMdpStubSkeletonProject Condition="'$(_NanoMdpStubSkeletonProject)' == ''">$(NanoGenerateSkeletonProjectName)</_NanoMdpStubSkeletonProject>
     <_NanoMdpStubSkeletonName Condition="'$(_NanoMdpStubSkeletonName)' == ''">$(NanoGenerateStubsRootName)</_NanoMdpStubSkeletonName>
     <_NanoMdpStubSkeletonFile Condition="'$(_NanoMdpStubSkeletonFile)' == ''">$(NanoGenerateSkeletonFile)</_NanoMdpStubSkeletonFile>
@@ -181,7 +182,7 @@
        header triggers a re-run even when .pe/.pdbx are up-to-date. Empty when stubs
        are disabled, so MSBuild ignores it for non-stub projects. -->
   <PropertyGroup>
-    <_NanoMdpStubMainHeader Condition="'$(_NanoMdpGenerateStubs)' == 'true'">$(_NanoMdpStubSkeletonFile)\$(NanoGenerateStubsRootName).h</_NanoMdpStubMainHeader>
+    <_NanoMdpStubMainHeader Condition="'$(NanoMdpGenerateStubs)' == 'true'">$(_NanoMdpStubSkeletonFile)\$(NanoGenerateStubsRootName).h</_NanoMdpStubMainHeader>
   </PropertyGroup>
 
   <!-- ============================================================ -->
@@ -221,11 +222,11 @@
         Parse="$(_NanoMdpParseInput)"
         IsCoreLibrary="$(NanoIsCoreLibrary)"
         Compile="$(_NanoMdpCompileOutput)"
-        DumpMetadata="$(_NanoMdpDumpMetadata)"
+        DumpMetadata="$(NanoMdpDumpMetadata)"
         DumpExports="$(_NanoMdpDumpExportsFile)"
         GenerateDependency="$(_NanoMdpDependencyMapFile)"
         SaveStrings="$(_NanoMdpSaveStringsFile)"
-        GenerateStubs="$(_NanoMdpGenerateStubs)"
+        GenerateStubs="$(NanoMdpGenerateStubs)"
         GenerateSkeletonFile="$(_NanoMdpStubSkeletonFile)"
         GenerateSkeletonName="$(_NanoMdpStubSkeletonName)"
         GenerateSkeletonProject="$(_NanoMdpStubSkeletonProject)"
@@ -284,8 +285,8 @@
   <!--  .dat artifact is still required for the core build, and      -->
   <!--  which MDP parameter emits it, must be confirmed against the  -->
   <!--  MDP task contract + the external mscorlib build before a     -->
-  <!--  step is re-added here. _NanoMdpGenerateDatFiles /            -->
-  <!--  _NanoMdpGenerateXmlFiles remain defined above as the future  -->
+  <!--  step is re-added here. NanoMdpGenerateDatFiles /             -->
+  <!--  NanoMdpGenerateXmlFiles remain defined above as the future   -->
   <!--  toggles for that work.                                      -->
   <!-- ============================================================ -->
 

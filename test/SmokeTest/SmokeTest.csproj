@@ -8,7 +8,7 @@
   </PropertyGroup>
 
   <PropertyGroup>
-    <_NanoMdpGenerateStubs>true</_NanoMdpGenerateStubs>
+    <NanoMdpGenerateStubs>true</NanoMdpGenerateStubs>
   </PropertyGroup>
 
   <ItemGroup>

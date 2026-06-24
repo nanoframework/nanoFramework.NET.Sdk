@@ -60,15 +60,14 @@ renames are local — except the external contracts listed in "Do NOT rename" be
 | `NFMDP_PE_Verbose` | `NanoMdpVerbose` |
 | `NFMDP_PE_VerboseMinimize` | `NanoMdpVerboseMinimize` |
 
-**C2 — internal switches (driven by `NanoIsCoreLibrary`, core-assembly mechanics) → `_NanoMdp…`:**
+**C2 — public project-file switches:**
 
 | Current | Proposed |
 |---|---|
-| `NFMDP_GENERATE_PE` | `_NanoMdpGeneratePe` |
-| `NFMDP_DUMP_METADATA` | `_NanoMdpDumpMetadata` |
-| `NFMDP_GENERATE_STUBS` | `_NanoMdpGenerateStubs` |
-| `NFMDP_DAT_FILES` | `_NanoMdpGenerateDatFiles` |
-| `NFMDP_XML_FILES` | `_NanoMdpGenerateXmlFiles` |
+| `_NanoMdpDumpMetadata` | `NanoMdpDumpMetadata` |
+| `_NanoMdpGenerateStubs` | `NanoMdpGenerateStubs` |
+| `_NanoMdpGenerateDatFiles` | `NanoMdpGenerateDatFiles` |
+| `_NanoMdpGenerateXmlFiles` | `NanoMdpGenerateXmlFiles` |
 
 **C3 — internal core-assembly path computations + stub params → `_NanoMdp…` / `_NanoMdpStub…`:**
 
@@ -161,7 +160,8 @@ Same shape for `NanoMdpVerboseMinimize` ← `NFMDP_PE_VerboseMinimize`, `NanoMdp
 
 All under [nanoFramework.NET.Sdk/Sdk/](nanoFramework.NET.Sdk/Sdk/):
 `Sdk.props`, `Sdk.targets`, `nanoFramework.Tfm.props`, `nanoFramework.Mdp.targets`,
-`nanoFramework.Output.targets`, `nanoFramework.Resources.targets`. (`nanoFramework.Capabilities.targets`
+`nanoFramework.Output.targets`, `nanoFramework.Resources.targets`. `test/SmokeTest/SmokeTest.csproj`
+was also updated to use the public `NanoMdpGenerateStubs` name. (`nanoFramework.Capabilities.targets`
 needs no change — its symbols are all the fixed CPS contract.) Update the explanatory header
 comments that mention the old names (e.g. the `_NfSdkTasksDir` / `NanoFramework_*` / `_NfMdpTasksTFM`
 references in the Sdk.targets and Mdp.targets banners).
