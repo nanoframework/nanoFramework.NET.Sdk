@@ -1,0 +1,53 @@
+  <!--
+    Copyright (c) .NET Foundation and Contributors.
+    See LICENSE file in the project root for full license information.
+  -->
+<Project>
+  <!--
+    nanoFramework.Capabilities.targets — CPS capability injection + debugger wiring.
+
+    ********************************************************************************
+    WARNING: DO NOT MODIFY this file unless you understand MSBuild targets.
+             Incorrect changes will break .NET nanoFramework project builds.
+    ********************************************************************************
+
+    Imported from Sdk.targets AFTER the Microsoft.NET.Sdk targets import so the
+    capability Remove follows the C# project system's Include in item document order
+    (otherwise the later Include re-adds the LaunchProfiles capability).
+
+    Holds:
+      - the NanoCSharpProject capability (lights up the nanoFramework CPS providers),
+      - the LaunchProfiles capability removal (so F5 routes to the NanoDebugger flavor
+        instead of launching a local .NET console app),
+      - the PropertyPageSchema wiring for the NanoDebugger property page.
+
+    Import paths use $(MSBuildThisFileDirectory) so they resolve inside the packed SDK.
+  -->
+
+  <!-- ============================================================ -->
+  <!--  Project capabilities                                        -->
+  <!-- ============================================================ -->
+  <ItemGroup>
+    <!-- Remove the C# project system's LaunchProfiles capability: otherwise its
+         ProjectDebuggerProvider owns F5 and launches a local .NET console app instead of
+         deploying/debugging on the device. The NanoDebugger flavor (DebuggerFlavor in
+         Sdk.props) + the NanoDebugger rule route F5 to the nanoFramework debug engine. -->
+    <ProjectCapability Remove="LaunchProfiles" />
+    <ProjectCapability Include="NanoCSharpProject" />
+    <!-- DEPLOYABLE/launchable only for the application (OutputType=Exe). Library projects omit this capability,
+         so VS never marks them for deploy and the nanoFramework deploy / debug-launch providers do not apply to
+         them (their .pe is included in the app's deploy bundle). This stops the redundant per-library deploy
+         transactions that race the debugger for the device ("There were deployment errors"). -->
+    <ProjectCapability Include="NanoDeployableProject" Condition="'$(OutputType)' == 'Exe'" />
+  </ItemGroup>
+
+  <!-- ============================================================ -->
+  <!--  Debugger property page (NanoDebugger flavor)                -->
+  <!-- ============================================================ -->
+  <ItemGroup>
+    <PropertyPageSchema Include="$(MSBuildThisFileDirectory)Rules\NanoDebugger.xaml">
+      <Context>Project</Context>
+    </PropertyPageSchema>
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,74 @@
+  <!--
+    Copyright (c) .NET Foundation and Contributors.
+    See LICENSE file in the project root for full license information.
+  -->
+  <Project>
+  <!--
+    nanoFramework.Tfm.props — the nanoFramework target-framework identity.
+
+    ********************************************************************************
+    WARNING: DO NOT MODIFY this file unless you understand MSBuild targets.
+             Incorrect changes will break .NET nanoFramework project builds.
+    ********************************************************************************
+
+    Imported from Sdk.props AFTER the Microsoft.NET.Sdk import, so it overrides
+    whatever the .NET SDK inferred for our custom TFM. Holds the netnano1.0 moniker,
+    the .NETnanoFramework identity, and the compiler/TFM-shaping props that suppress
+    standard .NET reference resolution (there is no netnano1.0 targeting pack and
+    nanoFramework ships its own mscorlib).
+
+    Import paths use $(MSBuildThisFileDirectory) so they resolve inside the packed SDK.
+  -->
+
+  <!-- ============================================================ -->
+  <!--  Default TargetFramework                                     -->
+  <!-- ============================================================ -->
+  <PropertyGroup>
+    <TargetFramework Condition="'$(TargetFramework)' == ''">netnano1.0</TargetFramework>
+
+    <!-- Disable .NET framework reference resolution — nanoFramework has its own mscorlib -->
+    <DisableImplicitFrameworkReferences>true</DisableImplicitFrameworkReferences>
+
+    <!-- Suppress NU1701 warning for the expected fallback -->
+    <NoWarn>$(NoWarn);NU1701</NoWarn>
+  </PropertyGroup>
+
+  <!-- ============================================================ -->
+  <!--  nanoFramework Target Framework Identity                     -->
+  <!--  (override whatever Microsoft.NET.Sdk inferred)              -->
+  <!-- ============================================================ -->
+  <PropertyGroup>
+    <TargetFrameworkIdentifier>.NETnanoFramework</TargetFrameworkIdentifier>
+    <TargetFrameworkVersion>v1.0</TargetFrameworkVersion>
+    <TargetFrameworkMoniker>.NETnanoFramework,Version=$(TargetFrameworkVersion)</TargetFrameworkMoniker>
+    <TargetFrameworkMonikerDisplayName>.NET nanoFramework 1.0</TargetFrameworkMonikerDisplayName>
+    <NuGetTargetMoniker>.NETnanoFramework,Version=$(TargetFrameworkVersion)</NuGetTargetMoniker>
+  </PropertyGroup>
+
+  <!-- ============================================================ -->
+  <!--  C# Compiler settings for nanoFramework                      -->
+  <!-- ============================================================ -->
+  <PropertyGroup>
+    <LangVersion Condition="'$(LangVersion)' == ''">13.0</LangVersion>
+
+    <!-- Prevent standard .NET library references — nanoFramework provides its own mscorlib -->
+    <NoStdLib>true</NoStdLib>
+    <NoCompilerStandardLib>true</NoCompilerStandardLib>
+    <AddAdditionalExplicitAssemblyReferences>false</AddAdditionalExplicitAssemblyReferences>
+
+    <!-- Disable .NET Framework-specific features -->
+    <AutoGenerateBindingRedirects>false</AutoGenerateBindingRedirects>
+    <DisableHandlePackageFileConflicts>true</DisableHandlePackageFileConflicts>
+
+    <!-- Required for Roslyn to compile without a standard class library -->
+    <TargetingClr2Framework>true</TargetingClr2Framework>
+
+    <!--
+      Point framework directories to the SDK folder (which has no .NET assemblies).
+      Prevents the compiler from accidentally resolving standard .NET types.
+    -->
+    <_TargetFrameworkDirectories>$(_NanoSdkDir)</_TargetFrameworkDirectories>
+    <_FullFrameworkReferenceAssemblyPaths>$(_NanoSdkDir)</_FullFrameworkReferenceAssemblyPaths>
+  </PropertyGroup>
+
+</Project>

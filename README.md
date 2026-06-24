@@ -47,9 +47,15 @@ Or pin the SDK version in `global.json`:
 
 ```
 src/
-  nanoFramework.Sdk/           SDK NuGet package (Sdk.props / Sdk.targets)
+  nanoFramework.NET.Sdk/           SDK NuGet package (Sdk.props / Sdk.targets)
   nanoFramework.Tools.BuildTasks/  Custom MSBuild tasks (resource gen, binary output, etc.)
 ```
+
+## Tools
+
+The `dotnet nano` umbrella CLI and the `nano-migrate` project migrator (with the companion
+SDK-migration skill) live in the [nanoframework/nf-tools](https://github.com/nanoframework/nf-tools)
+repository, under `tools/nano` and `tools/migrate`.
 
 ## Development
 

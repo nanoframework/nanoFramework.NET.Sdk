@@ -1,86 +1,69 @@
-<Project>
   <!--
-    nanoFramework SDK - Sdk.props
+    Copyright (c) .NET Foundation and Contributors.
+    See LICENSE file in the project root for full license information.
+  -->
+  <Project>
+  <!--
+    nanoFramework SDK - Sdk.props  (thin orchestrator)
     Auto-imported at the top of SDK-style nanoFramework projects.
+
+    ********************************************************************************
+    WARNING: DO NOT MODIFY this file unless you understand MSBuild targets.
+             Incorrect changes will break .NET nanoFramework project builds.
+    ********************************************************************************
 
     Strategy: Use Microsoft.NET.Sdk as the base SDK for standard MSBuild
     infrastructure (NuGet restore, PackageReference, implicit globs, pack).
     Override the TFM, compiler flags, and add nanoFramework-specific properties.
+
+    This file is a thin orchestrator: it owns the Microsoft.NET.Sdk props import
+    chain (so the legacy NFProjectSystem.CSharp.targets double-import cannot occur)
+    and <Import>s the focused module that carries the TFM identity. The matching
+    targets-time modules (MDP pipeline, CPS capabilities) are imported from
+    Sdk.targets, where project-body values like NanoIsCoreLibrary / TargetName have
+    been set.
   -->
 
   <!-- ============================================================ -->
-  <!--  Pre-SDK properties  (set BEFORE Microsoft.NET.Sdk import)    -->
+  <!--  Pre-SDK properties  (set BEFORE Microsoft.NET.Sdk import)   -->
   <!-- ============================================================ -->
   <PropertyGroup>
-    <TargetFramework Condition="'$(TargetFramework)' == ''">netnano1.0</TargetFramework>
-
-    <!-- Disable .NET framework reference resolution — nanoFramework has its own mscorlib -->
-    <DisableImplicitFrameworkReferences>true</DisableImplicitFrameworkReferences>
-
     <!--
-      Existing nanoFramework NuGet packages place files in a flat lib\ directory
-      (no TFM subfolder). NuGet interprets those as ".NETFramework,Version=v0.0".
-      AssetTargetFallback tells NuGet: if no netnano1.0 assets exist, accept "net" assets.
+      VS source-level debugging of nanoFramework projects resolves source<->IL from a
+      *Windows/full* PDB. Emit one for Debug. This MUST be set before the Microsoft.NET.Sdk
+      import below (that SDK defaults DebugType=portable when empty, so its default must be
+      pre-empted). Built in VS (.NET-Framework csc) `full` yields a Windows PDB and source
+      breakpoints bind; a portable PDB makes VS bind at the method entry only (one startup
+      hit, never on the line). Under `dotnet build` (.NET-Core csc) `full` still emits
+      portable, but the CLI doesn't debug — so Debug=full is the correct default. VS passes
+      Configuration as a global property, so it's set here; Release/CLI fall through to portable.
     -->
-    <AssetTargetFallback Condition="'$(AssetTargetFallback)' == ''">net</AssetTargetFallback>
-
-    <!-- Suppress NU1701 warning for the expected fallback -->
-    <NoWarn>$(NoWarn);NU1701</NoWarn>
+    <DebugType Condition="'$(DebugType)' == '' and '$(Configuration)' == 'Debug'">full</DebugType>
   </PropertyGroup>
 
   <!-- ============================================================ -->
-  <!--  Import Microsoft.NET.Sdk base infrastructure                 -->
+  <!--  Import Microsoft.NET.Sdk base infrastructure                -->
   <!-- ============================================================ -->
   <Import Sdk="Microsoft.NET.Sdk" Project="Sdk.props" />
 
   <!-- ============================================================ -->
-  <!--  SDK root paths (used to locate bundled task DLLs)            -->
+  <!--  SDK root paths (used to locate bundled task DLLs and to     -->
+  <!--  redirect framework-directory resolution — consumed by the   -->
+  <!--  TFM module below and the MDP module in Sdk.targets)         -->
   <!-- ============================================================ -->
   <PropertyGroup>
-    <_NfSdkDir>$(MSBuildThisFileDirectory)</_NfSdkDir>
-    <_NfSdkRoot>$(MSBuildThisFileDirectory)..\</_NfSdkRoot>
+    <_NanoSdkDir>$(MSBuildThisFileDirectory)</_NanoSdkDir>
+    <_NanoSdkRoot>$(MSBuildThisFileDirectory)..\</_NanoSdkRoot>
   </PropertyGroup>
 
   <!-- ============================================================ -->
-  <!--  nanoFramework Target Framework Identity                      -->
-  <!--  (override whatever Microsoft.NET.Sdk inferred)               -->
+  <!--  nanoFramework target-framework identity                     -->
+  <!--  (TFM moniker + compiler/TFM-shaping props)                  -->
   <!-- ============================================================ -->
-  <PropertyGroup>
-    <TargetFrameworkIdentifier>.NETnanoFramework</TargetFrameworkIdentifier>
-    <TargetFrameworkVersion>v1.0</TargetFrameworkVersion>
-    <TargetFrameworkMoniker>.NETnanoFramework,Version=$(TargetFrameworkVersion)</TargetFrameworkMoniker>
-    <TargetFrameworkMonikerDisplayName>.NET nanoFramework 1.0</TargetFrameworkMonikerDisplayName>
-    <NuGetTargetMoniker>.NETnanoFramework,Version=$(TargetFrameworkVersion)</NuGetTargetMoniker>
-  </PropertyGroup>
+  <Import Project="$(MSBuildThisFileDirectory)nanoFramework.Tfm.props" />
 
   <!-- ============================================================ -->
-  <!--  C# Compiler settings for nanoFramework                       -->
-  <!-- ============================================================ -->
-  <PropertyGroup>
-    <LangVersion Condition="'$(LangVersion)' == ''">13.0</LangVersion>
-
-    <!-- Prevent standard .NET library references — nanoFramework provides its own mscorlib -->
-    <NoStdLib>true</NoStdLib>
-    <NoCompilerStandardLib>true</NoCompilerStandardLib>
-    <AddAdditionalExplicitAssemblyReferences>false</AddAdditionalExplicitAssemblyReferences>
-
-    <!-- Disable .NET Framework-specific features -->
-    <AutoGenerateBindingRedirects>false</AutoGenerateBindingRedirects>
-    <DisableHandlePackageFileConflicts>true</DisableHandlePackageFileConflicts>
-
-    <!-- Required for Roslyn to compile without a standard class library -->
-    <TargetingClr2Framework>true</TargetingClr2Framework>
-
-    <!--
-      Point framework directories to the SDK folder (which has no .NET assemblies).
-      Prevents the compiler from accidentally resolving standard .NET types.
-    -->
-    <_TargetFrameworkDirectories>$(_NfSdkDir)</_TargetFrameworkDirectories>
-    <_FullFrameworkReferenceAssemblyPaths>$(_NfSdkDir)</_FullFrameworkReferenceAssemblyPaths>
-  </PropertyGroup>
-
-  <!-- ============================================================ -->
-  <!--  Visual Studio / IDE settings                                 -->
+  <!--  Visual Studio / IDE settings                                -->
   <!-- ============================================================ -->
   <PropertyGroup>
     <EnableUnmanagedDebugging>false</EnableUnmanagedDebugging>
@@ -90,47 +73,13 @@
     <GenerateManifests>true</GenerateManifests>
   </PropertyGroup>
 
-  <!-- Roslyn core assembly support (.rsp file) — actual setting moved to Sdk.targets -->
-
   <!--
-    NOTE: Core assembly (mscorlib) suppressions for GenerateAssembly*Attribute
-    are in Sdk.targets because IsCoreAssembly is set in the project file,
-    which is evaluated AFTER Sdk.props but BEFORE Sdk.targets.
+    NOTE: Core assembly (mscorlib) suppressions for GenerateAssembly*Attribute,
+    the NanoIsCoreLibrary-dependent MDP defaults, TargetName-derived stub paths,
+    and the MDP PackageReference all depend on values set in the project file
+    (evaluated AFTER Sdk.props). They live in the targets-time modules
+    (nanoFramework.Mdp.targets / nanoFramework.Capabilities.targets) imported from
+    Sdk.targets — NOT here.
   -->
-
-  <!-- ============================================================ -->
-  <!--  Metadata Processor defaults                                  -->
-  <!--  NOTE: NanoIsCoreLibrary-dependent defaults are in Sdk.targets -->
-  <!--  because the property is set in the project file.             -->
-  <!-- ============================================================ -->
-  <PropertyGroup>
-    <NFMDP_PE_Verbose Condition="'$(NFMDP_PE_Verbose)' == ''">false</NFMDP_PE_Verbose>
-    <NFMDP_PE_VerboseMinimize Condition="'$(NFMDP_PE_VerboseMinimize)' == ''">false</NFMDP_PE_VerboseMinimize>
-  </PropertyGroup>
-
-  <!-- Stub/skeleton path defaults (project-independent) -->
-  <PropertyGroup>
-    <NanoGenerateStubsDirectory Condition="'$(NanoGenerateStubsDirectory)' == ''">$(ProjectDir)Stubs</NanoGenerateStubsDirectory>
-  </PropertyGroup>
-  <!--
-    NOTE: NanoGenerateStubsRootName, NanoGenerateSkeletonProjectName, and
-    NanoGenerateSkeletonFile depend on $(TargetName) which is set after Sdk.props.
-    These defaults are in Sdk.targets.
-  -->
-
-  <!-- ============================================================ -->
-  <!--  Auto-inject MetadataProcessor package reference              -->
-  <!-- ============================================================ -->
-  <PropertyGroup>
-    <NanoFrameworkMDPVersion Condition="'$(NanoFrameworkMDPVersion)' == ''">3.0.29</NanoFrameworkMDPVersion>
-  </PropertyGroup>
-  <ItemGroup Condition="'$(NF_MDP_MSBUILDTASK_PATH)' == '' and '$(DisableNanoFrameworkMDP)' != 'true'">
-    <PackageReference Include="nanoFramework.Tools.MetadataProcessor.MsBuildTask"
-                      Version="$(NanoFrameworkMDPVersion)"
-                      PrivateAssets="all"
-                      GeneratePathProperty="true"
-                      ExcludeAssets="runtime;compile;build;buildTransitive"
-                      IsImplicitlyDefined="true" />
-  </ItemGroup>
 
 </Project>
