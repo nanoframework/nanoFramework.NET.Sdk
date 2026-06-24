@@ -52,8 +52,8 @@
   <!--  TFM module below and the MDP module in Sdk.targets)         -->
   <!-- ============================================================ -->
   <PropertyGroup>
-    <_NfSdkDir>$(MSBuildThisFileDirectory)</_NfSdkDir>
-    <_NfSdkRoot>$(MSBuildThisFileDirectory)..\</_NfSdkRoot>
+    <_NanoSdkDir>$(MSBuildThisFileDirectory)</_NanoSdkDir>
+    <_NanoSdkRoot>$(MSBuildThisFileDirectory)..\</_NanoSdkRoot>
   </PropertyGroup>
 
   <!-- ============================================================ -->

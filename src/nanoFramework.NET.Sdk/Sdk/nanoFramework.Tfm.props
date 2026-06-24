@@ -67,8 +67,8 @@
       Point framework directories to the SDK folder (which has no .NET assemblies).
       Prevents the compiler from accidentally resolving standard .NET types.
     -->
-    <_TargetFrameworkDirectories>$(_NfSdkDir)</_TargetFrameworkDirectories>
-    <_FullFrameworkReferenceAssemblyPaths>$(_NfSdkDir)</_FullFrameworkReferenceAssemblyPaths>
+    <_TargetFrameworkDirectories>$(_NanoSdkDir)</_TargetFrameworkDirectories>
+    <_FullFrameworkReferenceAssemblyPaths>$(_NanoSdkDir)</_FullFrameworkReferenceAssemblyPaths>
   </PropertyGroup>
 
 </Project>

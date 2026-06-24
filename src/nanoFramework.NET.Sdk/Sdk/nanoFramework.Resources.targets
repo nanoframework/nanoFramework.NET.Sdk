@@ -16,28 +16,28 @@
     into the assembly that the MetadataProcessor later processes.
 
     Imported by Sdk.targets AFTER nanoFramework.Mdp.targets, which defines the
-    shared $(_NfSdkTasksDir) used to resolve the build-tasks assembly below and
-    wires NanoResourceGenerator into PrepareResourcesDependsOn.
+    shared $(_NanoBuildTasksDir) used to resolve the build-tasks assembly below and
+    wires NanoGenerateResources into PrepareResourcesDependsOn.
   -->
 
   <!-- nanoFramework resource task (bundled in SDK) -->
   <UsingTask TaskName="nanoFramework.Tools.GenerateNanoResourceTask"
              Condition="'$(NF_MSBUILDTASK_PATH)' == ''"
-             AssemblyFile="$(_NfSdkTasksDir)nanoFramework.Tools.BuildTasks.dll" />
+             AssemblyFile="$(_NanoBuildTasksDir)nanoFramework.Tools.BuildTasks.dll" />
   <UsingTask TaskName="nanoFramework.Tools.GenerateNanoResourceTask"
              Condition="'$(NF_MSBUILDTASK_PATH)' != ''"
              AssemblyFile="$(NF_MSBUILDTASK_PATH)\nanoFramework.Tools.BuildTasks.dll" />
 
-  <Target Name="NanoResourceGenerator"
+  <Target Name="NanoGenerateResources"
           Condition="'@(EmbeddedResource)' != ''">
     <GenerateNanoResourceTask
         Sources="@(EmbeddedResource)"
         Condition="'%(EmbeddedResource.Type)' == 'Resx' and '%(EmbeddedResource.GenerateResource)' != 'false'"
         References="@(ReferencePath)"
         UseSourcePath="$(UseSourcePath)"
-        StateFile="$(IntermediateOutputPath)$(MSBuildProjectFile).NanoResourceGenerator.Cache"
+        StateFile="$(IntermediateOutputPath)$(MSBuildProjectFile).NanoGenerateResources.Cache"
         OutputResources="@(EmbeddedResource->'$(ProjectDir)$(IntermediateOutputPath)%(ManifestResourceName).nanoresources')">
-      <Output TaskParameter="OutputResources" ItemName="NanoFramework_Resources" />
+      <Output TaskParameter="OutputResources" ItemName="_NanoResources" />
       <Output TaskParameter="FilesWritten" ItemName="FileWrites" />
     </GenerateNanoResourceTask>
   </Target>

@@ -40,10 +40,16 @@
   <!--  mscorlib cannot reference itself, so suppress auto-generated -->
   <!--  assembly attributes that pull in System.* types.             -->
   <!--  These must be BEFORE Microsoft.NET.Sdk import but in targets -->
-  <!--  (not props) because IsCoreAssembly is set in the project     -->
+  <!--  (not props) because NanoIsCoreLibrary is set in the project  -->
   <!--  file, which is evaluated after Sdk.props but before targets. -->
   <!-- ============================================================= -->
-  <PropertyGroup Condition="'$(IsCoreAssembly)' == 'true'">
+
+  <!-- Back-compat: the legacy core-assembly flag was IsCoreAssembly; honor it -->
+  <PropertyGroup>
+    <NanoIsCoreLibrary Condition="'$(NanoIsCoreLibrary)' == '' and '$(IsCoreAssembly)' != ''">$(IsCoreAssembly)</NanoIsCoreLibrary>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(NanoIsCoreLibrary)' == 'True'">
     <GenerateAssemblyCompanyAttribute>false</GenerateAssemblyCompanyAttribute>
     <GenerateAssemblyConfigurationAttribute>false</GenerateAssemblyConfigurationAttribute>
     <GenerateAssemblyFileVersionAttribute>false</GenerateAssemblyFileVersionAttribute>
@@ -81,7 +87,7 @@
   <!--  Resources = resource generation;                             -->
   <!--  Output = binary / copy / clean.                              -->
   <!--  Import ORDER matters: Mdp defines the shared                 -->
-  <!--  $(_NfSdkTasksDir) / $(NanoFramework_*) properties the other  -->
+  <!--  $(_NanoBuildTasksDir) / $(_Nano*) properties the other       -->
   <!--  two modules rely on. All depend on TargetName /              -->
   <!--  NanoIsCoreLibrary set in the project body.                   -->
   <!-- ============================================================= -->
