@@ -13,15 +13,28 @@
 
     Imported from Sdk.targets AFTER the Microsoft.NET.Sdk targets import, so that
     $(TargetName), $(TargetDir), $(IntermediateOutputPath) and the standard build
-    targets (Compile, ResolveReferences, ...) are available for the MDP properties
-    and targets below.
+    targets (CoreCompile, ResolveReferences, ...) are available for the MDP
+    properties and targets below.
 
     Holds:
       - the auto-injected MDP PackageReference + NanoMdpVersion default,
       - the MDP property defaults (verbosity, NanoIsCoreLibrary-driven switches),
       - the _NanoMdpTasksTfm / task-DLL resolution and UsingTask declarations,
-      - the build pipeline overrides + all MDP / copy / clean / resource / binary
-        output targets that produce the .pe / .pdbx / resources.
+      - the single GenerateNanoPeFile target that emits the .pe / .pdbx (and, for
+        core assemblies, the stubs / dump-exports / dependency-map / strings).
+
+    Ordering strategy (see GenerateNanoPeFile): the PE stage is hooked with
+    AfterTargets="CoreCompile" rather than by redefining Microsoft's
+    *DependsOn chains. We only *append* to the standard chains (never replace
+    them), so the SDK stays robust to Microsoft.NET.Sdk changes:
+
+        ResolveReferences  ->  CoreCompile  ->  GenerateNanoPeFile (.pe/.pdbx)
+                                                      |
+                              NanoGenerateBinaryOutput / NanoReportChecksum
+                                                      |
+                              CopyFilesToOutputDirectory -> NanoCopyOutputFiles
+
+    The binary-output / copy / clean targets live in nanoFramework.Output.targets.
 
     Import paths use $(MSBuildThisFileDirectory) so they resolve inside the packed SDK.
   -->
@@ -74,14 +87,12 @@
   <!--  in a targets-time module (after Sdk.props).                 -->
   <!-- ============================================================ -->
   <PropertyGroup Condition="'$(NanoIsCoreLibrary)' == 'True'">
-    <_NanoMdpGeneratePe Condition="'$(_NanoMdpGeneratePe)' == ''">true</_NanoMdpGeneratePe>
     <_NanoMdpDumpMetadata Condition="'$(_NanoMdpDumpMetadata)' == ''">true</_NanoMdpDumpMetadata>
     <_NanoMdpGenerateStubs Condition="'$(_NanoMdpGenerateStubs)' == ''">true</_NanoMdpGenerateStubs>
     <_NanoMdpGenerateDatFiles Condition="'$(_NanoMdpGenerateDatFiles)' == ''">true</_NanoMdpGenerateDatFiles>
     <_NanoMdpGenerateXmlFiles Condition="'$(_NanoMdpGenerateXmlFiles)' == ''">true</_NanoMdpGenerateXmlFiles>
   </PropertyGroup>
   <PropertyGroup Condition="'$(NanoIsCoreLibrary)' != 'True'">
-    <_NanoMdpGeneratePe Condition="'$(_NanoMdpGeneratePe)' == ''">false</_NanoMdpGeneratePe>
     <_NanoMdpDumpMetadata Condition="'$(_NanoMdpDumpMetadata)' == ''">false</_NanoMdpDumpMetadata>
     <_NanoMdpGenerateStubs Condition="'$(_NanoMdpGenerateStubs)' == ''">false</_NanoMdpGenerateStubs>
     <_NanoMdpGenerateDatFiles Condition="'$(_NanoMdpGenerateDatFiles)' == ''">false</_NanoMdpGenerateDatFiles>
@@ -140,184 +151,125 @@
   </PropertyGroup>
 
   <!-- ============================================================ -->
-  <!--  Build pipeline overrides for REGULAR projects               -->
+  <!--  MDP invocation inputs (mode-independent + mode-specific)    -->
+  <!--                                                              -->
+  <!--  MDP parses the IL assembly that CoreCompile produced in the -->
+  <!--  intermediate dir and writes the .pe (+ .pdbx) next to it.   -->
+  <!--  Regular vs. core differences are expressed purely as the    -->
+  <!--  property values below, so the single GenerateNanoPeFile     -->
+  <!--  target can invoke MetaDataProcessorTask exactly once. Empty -->
+  <!--  path parameters (e.g. DumpExports for regular projects) are -->
+  <!--  treated as "skip" by the task.                              -->
   <!-- ============================================================ -->
-  <PropertyGroup Condition="'$(NanoIsCoreLibrary)' != 'True'">
-    <NanoMetadataProcessorDependsOn>Compile;_NanoCopyAssemblyToOutDir</NanoMetadataProcessorDependsOn>
+  <PropertyGroup>
+    <_NanoMdpParseInput>$(ProjectDir)$(IntermediateOutputPath)$(TargetFileName)</_NanoMdpParseInput>
+    <_NanoMdpCompileOutput>$(_NanoIntermediateAssembly).pe</_NanoMdpCompileOutput>
+    <_NanoMdpCompileOutputNoExt>$(_NanoIntermediateAssembly)</_NanoMdpCompileOutputNoExt>
 
-    <CoreBuildDependsOn>
-      BuildOnlySettings;
-      PrepareForBuild;
-      PreBuildEvent;
-      ResolveReferences;
-      PrepareResources;
-      ResolveKeySource;
-      Compile;
-      GenerateSerializationAssemblies;
-      CreateSatelliteAssemblies;
-      GetTargetPath;
-      PrepareForRun;
-      IncrementalClean;
-      NanoMetadataProcessor;
-      PostBuildEvent
-    </CoreBuildDependsOn>
-
-    <PrepareForRunDependsOn>
-      NanoMetadataProcessor;
-      CopyFilesToOutputDirectory;
-      NanoCopyOutputFiles;
-      _NanoCopyReferencesToIntermediate
-    </PrepareForRunDependsOn>
-
-    <PrepareResourcesDependsOn>
-      PrepareResourceNames;
-      ResGen;
-      CompileLicxFiles;
-      NanoGenerateResources
-    </PrepareResourcesDependsOn>
-
-    <ResolveReferencesDependsOn>
-      BeforeResolveReferences;
-      ResolveProjectReferences;
-      ResolveAssemblyReferences;
-      ResolveRuntimeDependencies;
-      AfterResolveReferences
-    </ResolveReferencesDependsOn>
+    <!-- Stub/skeleton inputs (consumed by the task only when _NanoMdpGenerateStubs == true) -->
+    <_NanoMdpStubSkeletonProject Condition="'$(_NanoMdpStubSkeletonProject)' == ''">$(NanoGenerateSkeletonProjectName)</_NanoMdpStubSkeletonProject>
+    <_NanoMdpStubSkeletonName Condition="'$(_NanoMdpStubSkeletonName)' == ''">$(NanoGenerateStubsRootName)</_NanoMdpStubSkeletonName>
+    <_NanoMdpStubSkeletonFile Condition="'$(_NanoMdpStubSkeletonFile)' == ''">$(NanoGenerateSkeletonFile)</_NanoMdpStubSkeletonFile>
   </PropertyGroup>
 
-  <!-- ============================================================ -->
-  <!--  Build pipeline overrides for CORE ASSEMBLY projects         -->
-  <!-- ============================================================ -->
-  <PropertyGroup Condition="'$(NanoIsCoreLibrary)' == 'True'">
-    <CoreBuildDependsOn>$(CoreBuildDependsOn);NanoMetadataProcessorCompile</CoreBuildDependsOn>
-    <PrepareResourcesDependsOn>$(PrepareResourcesDependsOn);NanoGenerateResources</PrepareResourcesDependsOn>
-    <CleanDependsOn>$(CleanDependsOn);_NanoCleanExtraFiles</CleanDependsOn>
-    <ResolveReferencesDependsOn>$(ResolveReferencesDependsOn);ResolveRuntimeDependencies</ResolveReferencesDependsOn>
-    <CoreBuildDependsOn>$(CoreBuildDependsOn);_NanoCreateDatabaseAndDependencyMap</CoreBuildDependsOn>
-    <_NanoMdpGenerateStubs>true</_NanoMdpGenerateStubs>
+  <!-- Regular projects: no stubs, keep interop in skeleton; dump/dependency/strings stay empty (no-op) -->
+  <PropertyGroup Condition="'$(NanoIsCoreLibrary)' != 'True'">
+    <_NanoMdpStubSkeletonWithoutInterop Condition="'$(_NanoMdpStubSkeletonWithoutInterop)' == ''">false</_NanoMdpStubSkeletonWithoutInterop>
+  </PropertyGroup>
 
-    <_NanoMdpParseInput>$(ProjectDir)$(IntermediateOutputPath)$(TargetFileName)</_NanoMdpParseInput>
-    <_NanoMdpCompileOutput>$(ProjectDir)$(IntermediateOutputPath)$(TargetName).pe</_NanoMdpCompileOutput>
-    <_NanoMdpCompileOutputNoExt>$(ProjectDir)$(IntermediateOutputPath)$(TargetName)</_NanoMdpCompileOutputNoExt>
+  <!-- Core assembly: emit stubs + dump exports + dependency map + strings -->
+  <PropertyGroup Condition="'$(NanoIsCoreLibrary)' == 'True'">
+    <_NanoMdpStubSkeletonWithoutInterop Condition="'$(_NanoMdpStubSkeletonWithoutInterop)' == ''">true</_NanoMdpStubSkeletonWithoutInterop>
     <_NanoMdpSaveStringsFile>$(ProjectDir)$(IntermediateOutputPath)$(TargetName).strings</_NanoMdpSaveStringsFile>
     <_NanoMdpDumpExportsFile>$(ProjectDir)$(IntermediateOutputPath)$(TargetName)_exports.txt</_NanoMdpDumpExportsFile>
     <_NanoMdpDependencyMapFile>$(ProjectDir)$(IntermediateOutputPath)$(TargetName)_dependency_map.xml</_NanoMdpDependencyMapFile>
-    <_NanoMdpStubSkeletonName>$(AssemblyName)</_NanoMdpStubSkeletonName>
-    <_NanoMdpStubResolve>true</_NanoMdpStubResolve>
+  </PropertyGroup>
+
+  <!-- Sentinel output for stub-generation: the main skeleton header produced by MDP when
+       GenerateStubs=true. Used in GenerateNanoPeFile Outputs so a missing/stale stub
+       header triggers a re-run even when .pe/.pdbx are up-to-date. Empty when stubs
+       are disabled, so MSBuild ignores it for non-stub projects. -->
+  <PropertyGroup>
+    <_NanoMdpStubMainHeader Condition="'$(_NanoMdpGenerateStubs)' == 'true'">$(_NanoMdpStubSkeletonFile)\$(NanoGenerateStubsRootName).h</_NanoMdpStubMainHeader>
   </PropertyGroup>
 
   <!-- ============================================================ -->
-  <!--  NanoMetadataProcessor target (REGULAR projects)             -->
+  <!--  Wire nanoFramework steps into the standard build pipeline   -->
+  <!--  by APPENDING to Microsoft's *DependsOn lists (never         -->
+  <!--  replacing them). The PE stage itself is ordered via         -->
+  <!--  AfterTargets on the targets below, not via these chains.    -->
   <!-- ============================================================ -->
-  <Target Name="NanoMetadataProcessor"
-          Inputs="$(_NanoOutputAssembly)$(TargetExt);@(ReferencePath);@(ReferenceDependencyPaths);@(_NanoResources)"
-          Outputs="$(_NanoIntermediateAssembly).pe"
-          DependsOnTargets="$(NanoMetadataProcessorDependsOn)"
-          Condition="'$(NanoIsCoreLibrary)' != 'True' and '$(DisableNanoMdp)' != 'true'">
+  <PropertyGroup>
+    <ResolveReferencesDependsOn>$(ResolveReferencesDependsOn);ResolveRuntimeDependencies</ResolveReferencesDependsOn>
+    <PrepareResourcesDependsOn>$(PrepareResourcesDependsOn);NanoGenerateResources</PrepareResourcesDependsOn>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(NanoIsCoreLibrary)' == 'True'">
+    <CleanDependsOn>$(CleanDependsOn);_NanoCleanExtraFiles</CleanDependsOn>
+  </PropertyGroup>
 
-    <PropertyGroup>
-      <_NanoMdpStubSkeletonProject>$(NanoGenerateSkeletonProjectName)</_NanoMdpStubSkeletonProject>
-      <_NanoMdpStubSkeletonName>$(NanoGenerateStubsRootName)</_NanoMdpStubSkeletonName>
-      <_NanoMdpStubSkeletonFile>$(NanoGenerateSkeletonFile)</_NanoMdpStubSkeletonFile>
-      <_NanoMdpStubSkeletonWithoutInterop>false</_NanoMdpStubSkeletonWithoutInterop>
-    </PropertyGroup>
+  <!-- ============================================================ -->
+  <!--  GenerateNanoPeFile — the single PE-emit stage               -->
+  <!--                                                              -->
+  <!--  Runs after CoreCompile (which guarantees ResolveReferences, -->
+  <!--  PrepareResources and the IL .dll are all done), and before  -->
+  <!--  PrepareForRun/CopyFilesToOutputDirectory. ONE                -->
+  <!--  MetaDataProcessorTask call serves both regular and core     -->
+  <!--  projects; the regular/core split lives entirely in the      -->
+  <!--  pre-computed properties above. Inputs/Outputs give it       -->
+  <!--  incrementality on every project.                            -->
+  <!-- ============================================================ -->
+  <Target Name="GenerateNanoPeFile"
+          Condition="'$(DisableNanoMdp)' != 'true'"
+          AfterTargets="CoreCompile"
+          DependsOnTargets="ResolveReferences;ResolveRuntimeDependencies;NanoGenerateResources"
+          Inputs="$(_NanoMdpParseInput);@(ReferencePath);@(ReferenceDependencyPaths);@(_NanoResources)"
+          Outputs="$(_NanoMdpCompileOutput);$(_NanoMdpCompileOutputNoExt).pdbx;$(_NanoMdpDumpExportsFile);$(_NanoMdpDependencyMapFile);$(_NanoMdpSaveStringsFile);$(_NanoMdpStubMainHeader)">
 
     <MetaDataProcessorTask
         Verbose="$(NanoMdpVerbose)"
-        Parse="$(_NanoOutputAssembly)$(TargetExt)"
-        IsCoreLibrary="$(NanoIsCoreLibrary)"
         VerboseMinimize="$(NanoMdpVerboseMinimize)"
-        DumpMetadata="$(_NanoMdpDumpMetadata)"
-        DumpExports="$(_NanoMdpStubDumpExports)"
-        GenerateDependency="$(_NanoMdpStubGenerateDependency)"
-        ExcludeClassByName="@(_NanoMdpExcludeClassByName)"
-        LoadHints="@(ReferencePath);@(ReferenceDependencyPaths);@(ReferenceSatellitePaths)"
-        Compile="$(_NanoIntermediateAssembly).pe"
-        GenerateStubs="$(_NanoMdpGenerateStubs)"
-        GenerateSkeletonFile="$(_NanoMdpStubSkeletonFile)"
-        GenerateSkeletonName="$(_NanoMdpStubSkeletonName)"
-        GenerateSkeletonProject="$(_NanoMdpStubSkeletonProject)"
-        SkeletonWithoutInterop="$(_NanoMdpStubSkeletonWithoutInterop)"
-        ImportResources="@(_NanoResources)">
-      <Output TaskParameter="FilesWritten" ItemName="FileWrites" />
-      <Output TaskParameter="NativeChecksum" PropertyName="NativeChecksum" />
-    </MetaDataProcessorTask>
-
-    <CallTarget Targets="NanoGenerateBinaryOutput" />
-
-    <!-- Output native checksum to CI pipelines -->
-    <Message Text="##vso[task.setvariable variable=NF_NATIVE_ASSEMBLY_CHECKSUM;]$(NativeChecksum)"
-             Condition="'$(TF_BUILD)' == 'True' and '$(NativeChecksum)' != '' and '$(NativeChecksum)' != '0x00000000'" />
-    <WriteLinesToFile File="$(GITHUB_ENV)" Lines="NF_NATIVE_ASSEMBLY_CHECKSUM=$(NativeChecksum)"
-                      Condition="'$(GITHUB_ACTIONS)' == 'True' and '$(NativeChecksum)' != '' and '$(NativeChecksum)' != '0x00000000'" />
-  </Target>
-
-  <!-- ============================================================ -->
-  <!--  NanoMetadataProcessorCompile target (CORE ASSEMBLY)         -->
-  <!-- ============================================================ -->
-  <Target Name="NanoMetadataProcessorCompile"
-          DependsOnTargets="ResolveRuntimeDependencies"
-          Condition="'$(_NanoMdpGeneratePe)' == 'true' and '$(NanoIsCoreLibrary)' == 'True'">
-
-    <PropertyGroup>
-      <_NanoMdpStubSkeletonProject Condition="'$(_NanoMdpStubSkeletonProject)' == ''">$(NanoGenerateSkeletonProjectName)</_NanoMdpStubSkeletonProject>
-      <_NanoMdpStubSkeletonName Condition="'$(_NanoMdpStubSkeletonName)' == ''">$(NanoGenerateStubsRootName)</_NanoMdpStubSkeletonName>
-      <_NanoMdpStubSkeletonFile Condition="'$(_NanoMdpStubSkeletonFile)' == ''">$(NanoGenerateSkeletonFile)</_NanoMdpStubSkeletonFile>
-      <_NanoMdpStubSkeletonWithoutInterop>true</_NanoMdpStubSkeletonWithoutInterop>
-    </PropertyGroup>
-
-    <!-- Compile to PE (no stubs) -->
-    <MetaDataProcessorTask
-        Verbose="$(NanoMdpVerbose)"
         Parse="$(_NanoMdpParseInput)"
-        VerboseMinimize="$(NanoMdpVerboseMinimize)"
+        IsCoreLibrary="$(NanoIsCoreLibrary)"
         Compile="$(_NanoMdpCompileOutput)"
         DumpMetadata="$(_NanoMdpDumpMetadata)"
         DumpExports="$(_NanoMdpDumpExportsFile)"
-        GenerateStubs="$(_NanoMdpGenerateStubs)"
         GenerateDependency="$(_NanoMdpDependencyMapFile)"
-        LoadHints="@(_NanoMdpLoadHints)"
-        ExcludeClassByName="@(_NanoMdpExcludeClassByName)"
-        Condition="'$(_NanoMdpGenerateStubs)' == 'false'">
-      <Output TaskParameter="FilesWritten" ItemName="FileWrites" />
-      <Output TaskParameter="NativeChecksum" PropertyName="NativeChecksum" />
-    </MetaDataProcessorTask>
-
-    <!-- Create STUB file -->
-    <MetaDataProcessorTask
-        Verbose="$(NanoMdpVerbose)"
-        Parse="$(_NanoMdpParseInput)"
-        IsCoreLibrary="$(NanoIsCoreLibrary)"
-        VerboseMinimize="$(NanoMdpVerboseMinimize)"
-        Compile="$(_NanoMdpCompileOutput)"
-        DumpMetadata="$(_NanoMdpDumpMetadata)"
+        SaveStrings="$(_NanoMdpSaveStringsFile)"
         GenerateStubs="$(_NanoMdpGenerateStubs)"
         GenerateSkeletonFile="$(_NanoMdpStubSkeletonFile)"
         GenerateSkeletonName="$(_NanoMdpStubSkeletonName)"
         GenerateSkeletonProject="$(_NanoMdpStubSkeletonProject)"
         SkeletonWithoutInterop="$(_NanoMdpStubSkeletonWithoutInterop)"
-        LoadHints="@(ReferencePath);@(ReferenceDependencyPaths);@(ReferenceSatellitePaths)"
         ExcludeClassByName="@(_NanoMdpExcludeClassByName)"
-        Condition="'$(_NanoMdpGenerateStubs)' == 'true'">
+        LoadHints="@(ReferencePath);@(ReferenceDependencyPaths);@(ReferenceSatellitePaths)"
+        ImportResources="@(_NanoResources)">
       <Output TaskParameter="FilesWritten" ItemName="FileWrites" />
-      <Output TaskParameter="NativeChecksum" PropertyName="NativeChecksum" />
+      <Output TaskParameter="NativeChecksum" PropertyName="NanoNativeMethodsChecksum" />
     </MetaDataProcessorTask>
 
-    <!-- Output native checksum to CI pipelines -->
-    <Message Text="##vso[task.setvariable variable=NF_NATIVE_ASSEMBLY_CHECKSUM;]$(NativeChecksum)"
-             Condition="'$(TF_BUILD)' == 'True' and '$(NativeChecksum)' != '' and '$(NativeChecksum)' != '0x00000000'" />
-    <WriteLinesToFile File="$(GITHUB_ENV)" Lines="NF_NATIVE_ASSEMBLY_CHECKSUM=$(NativeChecksum)"
-                      Condition="'$(GITHUB_ACTIONS)' == 'True' and '$(NativeChecksum)' != '' and '$(NativeChecksum)' != '0x00000000'" />
+    <!-- Register generated artifacts so Clean removes them (the task also reports
+         its own FilesWritten above; this is the documented PE/PDBX guarantee). -->
+    <ItemGroup>
+      <FileWrites Include="$(_NanoMdpCompileOutput);$(_NanoMdpCompileOutputNoExt).pdbx" />
+    </ItemGroup>
 
-    <CallTarget Targets="CopyFilesToOutputDirectory" />
-    <CallTarget Targets="NanoCopyOutputFiles" />
-    <CallTarget Targets="_NanoCopyReferencesToIntermediate" />
+    <!-- Persist the checksum to a sidecar file so NanoReportChecksum can read it
+         on incremental builds when this target is skipped and NanoNativeMethodsChecksum
+         is not re-populated by the task output. Only written when the checksum is
+         meaningful (non-empty and non-zero, meaning native methods are present). -->
+    <WriteLinesToFile File="$(_NanoMdpCompileOutputNoExt).checksum"
+                      Lines="$(NanoNativeMethodsChecksum)"
+                      Overwrite="true"
+                      Condition="'$(NanoNativeMethodsChecksum)' != '' and '$(NanoNativeMethodsChecksum)' != '0x00000000'" />
   </Target>
 
-  <Target Name="_NanoCreateDatabaseAndDependencyMap" DependsOnTargets="NanoMetadataProcessorDat" />
-
-  <!-- Placeholder DAT target (full implementation for core builds) -->
-  <Target Name="NanoMetadataProcessorDat" Condition="'$(_NanoMdpGenerateDatFiles)' == 'true'" />
+  <!-- Register the checksum sidecar in FileWrites at evaluation time (not inside
+       the target) so IncrementalClean does not treat it as an orphan on subsequent
+       incremental builds where GenerateNanoPeFile is skipped and the interior
+       ItemGroup never runs. Exists() prevents a spurious empty entry on first build. -->
+  <ItemGroup Condition="Exists('$(_NanoMdpCompileOutputNoExt).checksum')">
+    <FileWrites Include="$(_NanoMdpCompileOutputNoExt).checksum" />
+  </ItemGroup>
 
   <!-- ============================================================ -->
   <!--  ResolveRuntimeDependencies                                  -->
@@ -330,5 +282,21 @@
         StartProgram="$(_NanoStartProgram)"
         StartProgramReferences="@(_NanoStartProgramResolvedFiles);@(_NanoStartProgramResolvedDependencyFiles)" />
   </Target>
+
+  <!-- ============================================================ -->
+  <!--  .dat / .xml metadata-database generation (core) — RESERVED  -->
+  <!--                                                              -->
+  <!--  The legacy build produced .dat/.xml metadata-database files -->
+  <!--  for the core assembly via a separate, never-implemented     -->
+  <!--  step (the old NanoMetadataProcessorDat target was an empty  -->
+  <!--  placeholder). The dependency map is now emitted directly by -->
+  <!--  GenerateNanoPeFile (GenerateDependency). Whether a separate -->
+  <!--  .dat artifact is still required for the core build, and      -->
+  <!--  which MDP parameter emits it, must be confirmed against the  -->
+  <!--  MDP task contract + the external mscorlib build before a     -->
+  <!--  step is re-added here. _NanoMdpGenerateDatFiles /            -->
+  <!--  _NanoMdpGenerateXmlFiles remain defined above as the future  -->
+  <!--  toggles for that work.                                      -->
+  <!-- ============================================================ -->
 
 </Project>

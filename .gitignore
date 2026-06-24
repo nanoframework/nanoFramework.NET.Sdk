@@ -69,3 +69,4 @@ TestResult.xml
 
 ## macOS
 .DS_Store
+test/SmokeTest/Stubs
