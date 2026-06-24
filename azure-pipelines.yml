@@ -65,8 +65,6 @@ stages:
         git config --global core.autocrlf true
       displayName: Setup git identity
 
-    - template: azure-pipelines-templates/install-nbgv-tool.yml@templates
-
     # waiting for project to be public to enable SonarCloud analysis
     # - task: SonarCloudPrepare@3
     #   condition: >-
