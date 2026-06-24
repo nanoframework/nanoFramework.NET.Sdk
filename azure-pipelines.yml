@@ -271,11 +271,20 @@ stages:
         nugetConfigPath: '$(Build.SourcesDirectory)/test/SmokeTest/NuGet.Azdo.Config'
 
     - task: DotNetCoreCLI@2
-      displayName: Build SmokeTest
+      displayName: Build SmokeTest (dotnet build)
       inputs:
         command: 'build'
         projects: 'test/SmokeTest/SmokeTest.csproj'
         arguments: '--configuration $(buildConfiguration) --no-restore'
+
+    - task: VSBuild@1
+      displayName: Build SmokeTest (MSBuild)
+      inputs:
+        solution: 'test/SmokeTest/SmokeTest.csproj'
+        platform: '$(buildPlatform)'
+        configuration: '$(buildConfiguration)'
+        vsVersion: 'latest'
+        msbuildArgs: '/t:Build /p:Restore=false'
 
     - task: PowerShell@2
       displayName: Validate SmokeTest native checksum
@@ -292,6 +301,13 @@ stages:
           }
 
           Write-Host "Smoke test assembly checksum matches expected value: $expectedChecksum."
+
+    - task: PowerShell@2
+      displayName: Validate SmokeTest resource parity
+      inputs:
+        targetType: filePath
+        filePath: 'test/SmokeTest/Verify-Parity.ps1'
+        arguments: '-Configuration $(buildConfiguration)'
     
     - task: NuGetCommand@2
       condition: >-
