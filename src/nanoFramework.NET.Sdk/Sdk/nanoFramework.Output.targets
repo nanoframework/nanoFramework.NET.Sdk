@@ -42,8 +42,8 @@
   <!--  Copy targets                                                -->
   <!-- ============================================================ -->
   <Target Name="_NanoCopyAssemblyToOutDir">
-    <Copy Condition="Exists('$(ProjectDir)$(IntermediateOutputPath)$(TargetFileName)')"
-          SourceFiles="$(ProjectDir)$(IntermediateOutputPath)$(TargetFileName)"
+    <Copy Condition="Exists('$(IntermediateOutputPath)$(TargetFileName)')"
+          SourceFiles="$(IntermediateOutputPath)$(TargetFileName)"
           DestinationFolder="$(OutDir)">
       <Output TaskParameter="DestinationFiles" ItemName="FileWrites" />
     </Copy>

@@ -36,7 +36,7 @@
         References="@(ReferencePath)"
         UseSourcePath="$(UseSourcePath)"
         StateFile="$(IntermediateOutputPath)$(MSBuildProjectFile).NanoGenerateResources.Cache"
-        OutputResources="@(EmbeddedResource->'$(ProjectDir)$(IntermediateOutputPath)%(ManifestResourceName).nanoresources')">
+        OutputResources="@(EmbeddedResource->'$(IntermediateOutputPath)%(ManifestResourceName).nanoresources')">
       <Output TaskParameter="OutputResources" ItemName="_NanoResources" />
       <Output TaskParameter="FilesWritten" ItemName="FileWrites" />
     </GenerateNanoResourceTask>
