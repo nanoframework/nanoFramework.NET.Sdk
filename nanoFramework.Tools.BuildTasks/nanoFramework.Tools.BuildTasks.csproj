@@ -33,10 +33,10 @@
   <ItemGroup>
     <Compile Remove="**\*.cs" />
     <Compile Include="GenerateNanoResourceTask.Stub.cs" />
-    <Compile Include="..\..\..\nf-Visual-Studio-extension\Tools.BuildTasks-2019\GenerateBinaryOutputTask.cs" Link="GenerateBinaryOutputTask.cs" />
-    <Compile Include="..\..\..\nf-Visual-Studio-extension\Tools.BuildTasks-2019\ResolveRuntimeDependenciesTask.cs" Link="ResolveRuntimeDependenciesTask.cs" />
-    <Compile Include="..\..\..\nf-Visual-Studio-extension\Tools.BuildTasks-2019\TasksConstants.cs" Link="TasksConstants.cs" />
-    <Compile Include="..\..\..\nf-Visual-Studio-extension\Tools.BuildTasks-2019\Utilities\DebuggerHelper.cs" Link="Utilities\DebuggerHelper.cs" />
+    <Compile Include="..\..\nf-Visual-Studio-extension\Tools.BuildTasks-2019\GenerateBinaryOutputTask.cs" Link="GenerateBinaryOutputTask.cs" />
+    <Compile Include="..\..\nf-Visual-Studio-extension\Tools.BuildTasks-2019\ResolveRuntimeDependenciesTask.cs" Link="ResolveRuntimeDependenciesTask.cs" />
+    <Compile Include="..\..\nf-Visual-Studio-extension\Tools.BuildTasks-2019\TasksConstants.cs" Link="TasksConstants.cs" />
+    <Compile Include="..\..\nf-Visual-Studio-extension\Tools.BuildTasks-2019\Utilities\DebuggerHelper.cs" Link="Utilities\DebuggerHelper.cs" />
   </ItemGroup>
 
   <!--
@@ -46,8 +46,8 @@
     requires msbuild.exe / Visual Studio (net472).
   -->
   <ItemGroup Condition="'$(TargetFramework)' == 'net472'">
-    <Compile Include="..\..\..\nf-Visual-Studio-extension\Tools.BuildTasks-2019\GenerateNanoResourceTask.cs" Link="GenerateNanoResourceTask.cs" />
-    <Compile Include="..\..\..\nf-Visual-Studio-extension\Tools.BuildTasks-2019\ProcessResourceFiles.cs" Link="ProcessResourceFiles.cs" />
+    <Compile Include="..\..\nf-Visual-Studio-extension\Tools.BuildTasks-2019\GenerateNanoResourceTask.cs" Link="GenerateNanoResourceTask.cs" />
+    <Compile Include="..\..\nf-Visual-Studio-extension\Tools.BuildTasks-2019\ProcessResourceFiles.cs" Link="ProcessResourceFiles.cs" />
   </ItemGroup>
 
 </Project>

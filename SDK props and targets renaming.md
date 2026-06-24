@@ -3,7 +3,7 @@
 ## Context
 
 The new `nanoFramework.NET.Sdk` (on the `move-to-sdk` branch) carries its build logic in
-seven MSBuild files under [src/nanoFramework.NET.Sdk/Sdk/](src/nanoFramework.NET.Sdk/Sdk/).
+seven MSBuild files under [nanoFramework.NET.Sdk/Sdk/](nanoFramework.NET.Sdk/Sdk/).
 Those files accreted **four** different naming styles for symbols and properties:
 
 - `_NfXxx` — underscore + the `Nf` abbreviation (internal paths)
@@ -161,7 +161,7 @@ Same shape for `NanoMdpVerboseMinimize` ← `NFMDP_PE_VerboseMinimize`, `NanoMdp
 
 ## Files touched
 
-All under [src/nanoFramework.NET.Sdk/Sdk/](src/nanoFramework.NET.Sdk/Sdk/):
+All under [nanoFramework.NET.Sdk/Sdk/](nanoFramework.NET.Sdk/Sdk/):
 `Sdk.props`, `Sdk.targets`, `nanoFramework.Tfm.props`, `nanoFramework.Mdp.targets`,
 `nanoFramework.Output.targets`, `nanoFramework.Resources.targets`. (`nanoFramework.Capabilities.targets`
 needs no change — its symbols are all the fixed CPS contract.) Update the explanatory header
@@ -177,7 +177,7 @@ references in the Sdk.targets and Mdp.targets banners).
 
 ## Verification
 
-1. Pack/build the SDK: `dotnet build src/nanoFramework.NET.Sdk/nanoFramework.NET.Sdk.csproj`.
+1. Pack/build the SDK: `dotnet build nanoFramework.NET.Sdk/nanoFramework.NET.Sdk.csproj`.
 2. Build the smoke test against the local SDK:
    `dotnet build test/SmokeTest/SmokeTest.csproj -c Debug` — confirm it restores the MDP package,
    runs `NanoMetadataProcessor`, and emits `SmokeTest.pe` + `SmokeTest.pdbx` under

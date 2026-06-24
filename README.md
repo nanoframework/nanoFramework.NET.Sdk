@@ -46,9 +46,8 @@ Or pin the SDK version in `global.json`:
 ## Project Structure
 
 ```
-src/
-  nanoFramework.NET.Sdk/           SDK NuGet package (Sdk.props / Sdk.targets)
-  nanoFramework.Tools.BuildTasks/  Custom MSBuild tasks (resource gen, binary output, etc.)
+nanoFramework.NET.Sdk/             SDK NuGet package (Sdk.props / Sdk.targets)
+nanoFramework.Tools.BuildTasks/     Custom MSBuild tasks (resource gen, binary output, etc.)
 ```
 
 ## Tools
@@ -61,7 +60,7 @@ repository, under `tools/nano` and `tools/migrate`.
 
 ```bash
 dotnet build
-dotnet pack src\nanoFramework.NET.Sdk\nanoFramework.NET.Sdk.csproj
+dotnet pack nanoFramework.NET.Sdk\nanoFramework.NET.Sdk.csproj
 ```
 
 The resulting `.nupkg` can be tested locally by adding its output directory as a NuGet source.

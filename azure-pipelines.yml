@@ -157,7 +157,7 @@ stages:
       displayName: Pack
       inputs:
         command: 'pack'
-        packagesToPack: '**/src/nanoFramework.NET.Sdk.csproj'
+        packagesToPack: '**/nanoFramework.NET.Sdk.csproj'
         versioningScheme: 'off'
         arguments: '--configuration $(buildConfiguration) /p:PublicRelease=true --output $(Build.ArtifactStagingDirectory)'
 

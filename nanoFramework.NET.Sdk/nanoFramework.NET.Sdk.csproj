@@ -71,11 +71,11 @@
       README.md
   -->
   <ItemGroup>
-    <None Include="..\..\assets\nf-logo.png">
+    <None Include="..\assets\nf-logo.png">
       <Pack>True</Pack>
       <PackagePath>\</PackagePath>
     </None>
-    <None Include="..\..\LICENSE.md">
+    <None Include="..\LICENSE.md">
       <Pack>True</Pack>
       <PackagePath>\</PackagePath>
     </None>
@@ -103,7 +103,7 @@
     <None Include="..\nanoFramework.Tools.BuildTasks\bin\$(Configuration)\net8.0\nanoFramework.Tools.BuildTasks.pdb" Pack="true" PackagePath="tasks\net8.0" Condition="Exists('..\nanoFramework.Tools.BuildTasks\bin\$(Configuration)\net8.0\nanoFramework.Tools.BuildTasks.pdb')" />
 
     <!-- Package README -->
-    <None Include="..\..\README.md" Pack="true" PackagePath="" />
+    <None Include="..\README.md" Pack="true" PackagePath="" />
   </ItemGroup>
 
 </Project>
