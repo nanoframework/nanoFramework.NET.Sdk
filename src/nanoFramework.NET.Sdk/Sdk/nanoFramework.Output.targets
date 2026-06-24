@@ -50,7 +50,7 @@
           Condition="'$(DisableNanoMdp)' != 'true' and '$(NanoIsCoreLibrary)' != 'True'"
           DependsOnTargets="ResolveReferences">
     <GenerateBinaryOutputTask
-        AssemblyPE="$(_NanoIntermediateAssembly).pe"
+        AssemblyPE="$(_NanoMdpCompileOutput)"
         Assembly="$(_NanoOutputAssembly)$(TargetExt)"
         AssemblyReferences="@(ReferencePath);@(ReferenceDependencyPaths)">
       <Output TaskParameter="FileWritten" ItemName="FileWrites" />
@@ -59,16 +59,27 @@
 
   <!-- ============================================================ -->
   <!--  Surface the native methods checksum                         -->
-  <!--  $(NanoNativeMethodsChecksum) is set by GenerateNanoPeFile.  -->
-  <!--  Emit it as a CI variable for external pipelines (the legacy -->
-  <!--  NF_NATIVE_ASSEMBLY_CHECKSUM contract is preserved).         -->
+  <!--  Reads from the sidecar .checksum file written by            -->
+  <!--  GenerateNanoPeFile so it works on incremental builds where  -->
+  <!--  the PE step is skipped and NanoNativeMethodsChecksum is not -->
+  <!--  re-populated. Importance="High" ensures the ##vso logging   -->
+  <!--  command reaches the Azure Pipelines agent even when MSBuild -->
+  <!--  runs at minimal verbosity (/v:m).                           -->
+  <!--  NF_NATIVE_ASSEMBLY_CHECKSUM is a fixed external contract.   -->
   <!-- ============================================================ -->
   <Target Name="NanoReportChecksum"
           AfterTargets="GenerateNanoPeFile"
-          Condition="'$(NanoNativeMethodsChecksum)' != '' and '$(NanoNativeMethodsChecksum)' != '0x00000000'">
-    <Message Text="##vso[task.setvariable variable=NF_NATIVE_ASSEMBLY_CHECKSUM;]$(NanoNativeMethodsChecksum)"
+          Condition="Exists('$(_NanoMdpCompileOutputNoExt).checksum')">
+    <ReadLinesFromFile File="$(_NanoMdpCompileOutputNoExt).checksum">
+      <Output TaskParameter="Lines" ItemName="_NanoChecksumLines" />
+    </ReadLinesFromFile>
+    <PropertyGroup>
+      <_NanoNativeMethodsChecksumPersisted>@(_NanoChecksumLines)</_NanoNativeMethodsChecksumPersisted>
+    </PropertyGroup>
+    <Message Text="##vso[task.setvariable variable=NF_NATIVE_ASSEMBLY_CHECKSUM;]$(_NanoNativeMethodsChecksumPersisted)"
+             Importance="High"
              Condition="'$(TF_BUILD)' == 'True'" />
-    <WriteLinesToFile File="$(GITHUB_ENV)" Lines="NF_NATIVE_ASSEMBLY_CHECKSUM=$(NanoNativeMethodsChecksum)"
+    <WriteLinesToFile File="$(GITHUB_ENV)" Lines="NF_NATIVE_ASSEMBLY_CHECKSUM=$(_NanoNativeMethodsChecksumPersisted)"
                       Condition="'$(GITHUB_ACTIONS)' == 'True'" />
   </Target>
 

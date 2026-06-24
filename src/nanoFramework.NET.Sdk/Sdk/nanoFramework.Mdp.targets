@@ -185,6 +185,14 @@
     <_NanoMdpDependencyMapFile>$(ProjectDir)$(IntermediateOutputPath)$(TargetName)_dependency_map.xml</_NanoMdpDependencyMapFile>
   </PropertyGroup>
 
+  <!-- Sentinel output for stub-generation: the main skeleton header produced by MDP when
+       GenerateStubs=true. Used in GenerateNanoPeFile Outputs so a missing/stale stub
+       header triggers a re-run even when .pe/.pdbx are up-to-date. Empty when stubs
+       are disabled, so MSBuild ignores it for non-stub projects. -->
+  <PropertyGroup>
+    <_NanoMdpStubMainHeader Condition="'$(_NanoMdpGenerateStubs)' == 'true'">$(_NanoMdpStubSkeletonFile)\$(NanoGenerateStubsRootName).h</_NanoMdpStubMainHeader>
+  </PropertyGroup>
+
   <!-- ============================================================ -->
   <!--  Wire nanoFramework steps into the standard build pipeline   -->
   <!--  by APPENDING to Microsoft's *DependsOn lists (never         -->
@@ -215,7 +223,7 @@
           AfterTargets="CoreCompile"
           DependsOnTargets="ResolveReferences;ResolveRuntimeDependencies;NanoGenerateResources"
           Inputs="$(_NanoMdpParseInput);@(ReferencePath);@(ReferenceDependencyPaths);@(_NanoResources)"
-          Outputs="$(_NanoMdpCompileOutput);$(_NanoMdpCompileOutputNoExt).pdbx">
+          Outputs="$(_NanoMdpCompileOutput);$(_NanoMdpCompileOutputNoExt).pdbx;$(_NanoMdpDumpExportsFile);$(_NanoMdpDependencyMapFile);$(_NanoMdpSaveStringsFile);$(_NanoMdpStubMainHeader)">
 
     <MetaDataProcessorTask
         Verbose="$(NanoMdpVerbose)"
@@ -244,7 +252,24 @@
     <ItemGroup>
       <FileWrites Include="$(_NanoMdpCompileOutput);$(_NanoMdpCompileOutputNoExt).pdbx" />
     </ItemGroup>
+
+    <!-- Persist the checksum to a sidecar file so NanoReportChecksum can read it
+         on incremental builds when this target is skipped and NanoNativeMethodsChecksum
+         is not re-populated by the task output. Only written when the checksum is
+         meaningful (non-empty and non-zero, meaning native methods are present). -->
+    <WriteLinesToFile File="$(_NanoMdpCompileOutputNoExt).checksum"
+                      Lines="$(NanoNativeMethodsChecksum)"
+                      Overwrite="true"
+                      Condition="'$(NanoNativeMethodsChecksum)' != '' and '$(NanoNativeMethodsChecksum)' != '0x00000000'" />
   </Target>
+
+  <!-- Register the checksum sidecar in FileWrites at evaluation time (not inside
+       the target) so IncrementalClean does not treat it as an orphan on subsequent
+       incremental builds where GenerateNanoPeFile is skipped and the interior
+       ItemGroup never runs. Exists() prevents a spurious empty entry on first build. -->
+  <ItemGroup Condition="Exists('$(_NanoMdpCompileOutputNoExt).checksum')">
+    <FileWrites Include="$(_NanoMdpCompileOutputNoExt).checksum" />
+  </ItemGroup>
 
   <!-- ============================================================ -->
   <!--  ResolveRuntimeDependencies                                  -->
