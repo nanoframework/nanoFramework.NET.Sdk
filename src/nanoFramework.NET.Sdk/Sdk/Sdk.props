@@ -7,6 +7,11 @@
     nanoFramework SDK - Sdk.props  (thin orchestrator)
     Auto-imported at the top of SDK-style nanoFramework projects.
 
+    ********************************************************************************
+    WARNING: DO NOT MODIFY this file unless you understand MSBuild targets.
+             Incorrect changes will break .NET nanoFramework project builds.
+    ********************************************************************************
+
     Strategy: Use Microsoft.NET.Sdk as the base SDK for standard MSBuild
     infrastructure (NuGet restore, PackageReference, implicit globs, pack).
     Override the TFM, compiler flags, and add nanoFramework-specific properties.

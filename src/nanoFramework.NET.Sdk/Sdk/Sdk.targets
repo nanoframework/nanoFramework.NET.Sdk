@@ -7,6 +7,11 @@
     nanoFramework SDK - Sdk.targets  (thin orchestrator)
     Auto-imported at the bottom of SDK-style nanoFramework projects.
 
+    ********************************************************************************
+    WARNING: DO NOT MODIFY this file unless you understand MSBuild targets.
+             Incorrect changes will break .NET nanoFramework project builds.
+    ********************************************************************************
+
     Strategy: Import Microsoft.NET.Sdk targets (C# compilation, NuGet resolution, pack),
     then add nanoFramework build pipeline (MetadataProcessor, resource gen, binary output).
 

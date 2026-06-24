@@ -6,6 +6,11 @@
   <!--
     nanoFramework.Tfm.props — the nanoFramework target-framework identity.
 
+    ********************************************************************************
+    WARNING: DO NOT MODIFY this file unless you understand MSBuild targets.
+             Incorrect changes will break .NET nanoFramework project builds.
+    ********************************************************************************
+
     Imported from Sdk.props AFTER the Microsoft.NET.Sdk import, so it overrides
     whatever the .NET SDK inferred for our custom TFM. Holds the netnano1.0 moniker,
     the .NETnanoFramework identity, and the compiler/TFM-shaping props that suppress

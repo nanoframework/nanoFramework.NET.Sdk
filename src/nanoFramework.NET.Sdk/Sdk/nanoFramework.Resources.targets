@@ -6,6 +6,11 @@
   <!--
     nanoFramework.Resources.targets — managed resource generation.
 
+    ********************************************************************************
+    WARNING: DO NOT MODIFY this file unless you understand MSBuild targets.
+             Incorrect changes will break .NET nanoFramework project builds.
+    ********************************************************************************
+
     Converts .resx / managed resources into the nanoFramework resource format
     (.nanoresources) during the PrepareResources phase, so they can be embedded
     into the assembly that the MetadataProcessor later processes.

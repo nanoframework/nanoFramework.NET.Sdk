@@ -6,6 +6,11 @@
   <!--
     nanoFramework.Mdp.targets — the Metadata Processor (MDP) build pipeline.
 
+    ********************************************************************************
+    WARNING: DO NOT MODIFY this file unless you understand MSBuild targets.
+             Incorrect changes will break .NET nanoFramework project builds.
+    ********************************************************************************
+
     Imported from Sdk.targets AFTER the Microsoft.NET.Sdk targets import, so that
     $(TargetName), $(TargetDir), $(IntermediateOutputPath) and the standard build
     targets (Compile, ResolveReferences, ...) are available for the MDP properties

@@ -6,6 +6,11 @@
   <!--
     nanoFramework.Output.targets — final output production and housekeeping.
 
+    ********************************************************************************
+    WARNING: DO NOT MODIFY this file unless you understand MSBuild targets.
+             Incorrect changes will break .NET nanoFramework project builds.
+    ********************************************************************************
+
     Produces the deployable binary (GenerateBinaryOutputTask), copies the .pe /
     .pdbx artifacts between the intermediate and output directories, and cleans
     the generated nanoFramework files. These run after the MetadataProcessor has

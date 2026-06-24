@@ -6,6 +6,11 @@
   <!--
     nanoFramework.Capabilities.targets — CPS capability injection + debugger wiring.
 
+    ********************************************************************************
+    WARNING: DO NOT MODIFY this file unless you understand MSBuild targets.
+             Incorrect changes will break .NET nanoFramework project builds.
+    ********************************************************************************
+
     Imported from Sdk.targets AFTER the Microsoft.NET.Sdk targets import so the
     capability Remove follows the C# project system's Include in item document order
     (otherwise the later Include re-adds the LaunchProfiles capability).
