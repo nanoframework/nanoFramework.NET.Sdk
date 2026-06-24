@@ -31,7 +31,7 @@
              AssemblyFile="$(NF_MSBUILDTASK_PATH)\nanoFramework.Tools.BuildTasks.dll" />
 
   <!-- ============================================================ -->
-  <!--  Clean targets                                                -->
+  <!--  Clean targets                                               -->
   <!-- ============================================================ -->
   <Target Name="NanoFrameworkClean">
     <Delete Condition="EXISTS('$(OutDir)$(TargetName).pe')"   Files="$(OutDir)$(TargetName).pe" />
@@ -39,7 +39,7 @@
   </Target>
 
   <!-- ============================================================ -->
-  <!--  Copy targets                                                 -->
+  <!--  Copy targets                                                -->
   <!-- ============================================================ -->
   <Target Name="CopyToOutDir">
     <Copy Condition="Exists('$(ProjectDir)$(IntermediateOutputPath)$(TargetFileName)')"
@@ -81,7 +81,7 @@
   </Target>
 
   <!-- ============================================================ -->
-  <!--  Binary output                                                -->
+  <!--  Binary output                                               -->
   <!-- ============================================================ -->
   <Target Name="NanoGenerateBinaryOutput"
           DependsOnTargets="ResolveReferences">

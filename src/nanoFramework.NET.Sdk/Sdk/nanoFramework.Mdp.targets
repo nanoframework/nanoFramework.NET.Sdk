@@ -27,7 +27,7 @@
   -->
 
   <!-- ============================================================ -->
-  <!--  Metadata Processor defaults (project-independent)            -->
+  <!--  Metadata Processor defaults (project-independent)           -->
   <!-- ============================================================ -->
   <PropertyGroup>
     <NFMDP_PE_Verbose Condition="'$(NFMDP_PE_Verbose)' == ''">false</NFMDP_PE_Verbose>
@@ -40,7 +40,7 @@
   </PropertyGroup>
 
   <!-- ============================================================ -->
-  <!--  Auto-inject MetadataProcessor package reference              -->
+  <!--  Auto-inject MetadataProcessor package reference             -->
   <!-- ============================================================ -->
   <PropertyGroup>
     <NanoFrameworkMDPVersion Condition="'$(NanoFrameworkMDPVersion)' == ''">4.0.0-preview.98</NanoFrameworkMDPVersion>
@@ -55,9 +55,9 @@
   </ItemGroup>
 
   <!-- ============================================================ -->
-  <!--  Metadata Processor defaults (depend on NanoIsCoreLibrary)    -->
-  <!--  NanoIsCoreLibrary is set in the project file, so these are   -->
-  <!--  in a targets-time module (after Sdk.props).                  -->
+  <!--  Metadata Processor defaults (depend on NanoIsCoreLibrary)   -->
+  <!--  NanoIsCoreLibrary is set in the project file, so these are  -->
+  <!--  in a targets-time module (after Sdk.props).                 -->
   <!-- ============================================================ -->
   <PropertyGroup Condition="'$(NanoIsCoreLibrary)' == 'True'">
     <NFMDP_GENERATE_PE Condition="'$(NFMDP_GENERATE_PE)' == ''">true</NFMDP_GENERATE_PE>
@@ -75,8 +75,8 @@
   </PropertyGroup>
 
   <!-- ============================================================ -->
-  <!--  Stub/skeleton path defaults                                  -->
-  <!--  (depend on $(TargetName), available after the SDK import)    -->
+  <!--  Stub/skeleton path defaults                                 -->
+  <!--  (depend on $(TargetName), available after the SDK import)   -->
   <!-- ============================================================ -->
   <PropertyGroup>
     <NanoGenerateStubsRootName Condition="'$(NanoGenerateStubsRootName)' == ''">$(TargetName)</NanoGenerateStubsRootName>
@@ -85,7 +85,7 @@
   </PropertyGroup>
 
   <!-- ============================================================ -->
-  <!--  Build task declarations                                      -->
+  <!--  Build task declarations                                     -->
   <!-- ============================================================ -->
   <PropertyGroup>
     <_NfSdkTasksDir Condition="'$(MSBuildRuntimeType)' == 'Core'">$(_NfSdkRoot)tasks\net8.0\</_NfSdkTasksDir>
@@ -117,7 +117,7 @@
              AssemblyFile="$(_NfMdpTasksDir)nanoFramework.Tools.MetadataProcessor.MsBuildTask.dll" />
 
   <!-- ============================================================ -->
-  <!--  Common MDP build pipeline properties                         -->
+  <!--  Common MDP build pipeline properties                        -->
   <!-- ============================================================ -->
   <PropertyGroup>
     <NanoFramework_StartProgram Condition="'$(StartAction)' == 'Program'">$(StartProgram)</NanoFramework_StartProgram>
@@ -126,7 +126,7 @@
   </PropertyGroup>
 
   <!-- ============================================================ -->
-  <!--  Build pipeline overrides for REGULAR projects                -->
+  <!--  Build pipeline overrides for REGULAR projects               -->
   <!-- ============================================================ -->
   <PropertyGroup Condition="'$(NanoIsCoreLibrary)' != 'True'">
     <MetaDataProcessorDependsOn>Compile;CopyToOutDir</MetaDataProcessorDependsOn>
@@ -172,7 +172,7 @@
   </PropertyGroup>
 
   <!-- ============================================================ -->
-  <!--  Build pipeline overrides for CORE ASSEMBLY projects          -->
+  <!--  Build pipeline overrides for CORE ASSEMBLY projects         -->
   <!-- ============================================================ -->
   <PropertyGroup Condition="'$(NanoIsCoreLibrary)' == 'True'">
     <CoreBuildDependsOn>$(CoreBuildDependsOn);MetaDataProcessorCompile</CoreBuildDependsOn>
@@ -193,7 +193,7 @@
   </PropertyGroup>
 
   <!-- ============================================================ -->
-  <!--  MetaDataProcessor target (REGULAR projects)                  -->
+  <!--  MetaDataProcessor target (REGULAR projects)                 -->
   <!-- ============================================================ -->
   <Target Name="MetaDataProcessor"
           Inputs="$(NanoFramework_Assembly)$(TargetExt);@(ReferencePath);@(ReferenceDependencyPaths);@(NanoFramework_Resources)"
@@ -239,7 +239,7 @@
   </Target>
 
   <!-- ============================================================ -->
-  <!--  MetaDataProcessorCompile target (CORE ASSEMBLY)              -->
+  <!--  MetaDataProcessorCompile target (CORE ASSEMBLY)             -->
   <!-- ============================================================ -->
   <Target Name="MetaDataProcessorCompile"
           DependsOnTargets="ResolveRuntimeDependencies"
@@ -306,7 +306,7 @@
   <Target Name="MetaDataProcessorDat" Condition="'$(NFMDP_DAT_FILES)' == 'true'" />
 
   <!-- ============================================================ -->
-  <!--  ResolveRuntimeDependencies                                   -->
+  <!--  ResolveRuntimeDependencies                                  -->
   <!-- ============================================================ -->
   <Target Name="ResolveRuntimeDependencies">
     <ResolveRuntimeDependenciesTask

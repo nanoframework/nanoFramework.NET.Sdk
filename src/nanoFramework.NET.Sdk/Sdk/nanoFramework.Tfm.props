@@ -21,7 +21,7 @@
   -->
 
   <!-- ============================================================ -->
-  <!--  Default TargetFramework                                      -->
+  <!--  Default TargetFramework                                     -->
   <!-- ============================================================ -->
   <PropertyGroup>
     <TargetFramework Condition="'$(TargetFramework)' == ''">netnano1.0</TargetFramework>
@@ -41,8 +41,8 @@
   </PropertyGroup>
 
   <!-- ============================================================ -->
-  <!--  nanoFramework Target Framework Identity                      -->
-  <!--  (override whatever Microsoft.NET.Sdk inferred)               -->
+  <!--  nanoFramework Target Framework Identity                     -->
+  <!--  (override whatever Microsoft.NET.Sdk inferred)              -->
   <!-- ============================================================ -->
   <PropertyGroup>
     <TargetFrameworkIdentifier>.NETnanoFramework</TargetFrameworkIdentifier>
@@ -53,7 +53,7 @@
   </PropertyGroup>
 
   <!-- ============================================================ -->
-  <!--  C# Compiler settings for nanoFramework                       -->
+  <!--  C# Compiler settings for nanoFramework                      -->
   <!-- ============================================================ -->
   <PropertyGroup>
     <LangVersion Condition="'$(LangVersion)' == ''">13.0</LangVersion>

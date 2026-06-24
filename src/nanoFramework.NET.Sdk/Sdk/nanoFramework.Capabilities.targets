@@ -25,7 +25,7 @@
   -->
 
   <!-- ============================================================ -->
-  <!--  Project capabilities                                         -->
+  <!--  Project capabilities                                        -->
   <!-- ============================================================ -->
   <ItemGroup>
     <!-- Remove the C# project system's LaunchProfiles capability: otherwise its
@@ -42,7 +42,7 @@
   </ItemGroup>
 
   <!-- ============================================================ -->
-  <!--  Debugger property page (NanoDebugger flavor)                  -->
+  <!--  Debugger property page (NanoDebugger flavor)                -->
   <!-- ============================================================ -->
   <ItemGroup>
     <PropertyPageSchema Include="$(MSBuildThisFileDirectory)Rules\NanoDebugger.xaml">

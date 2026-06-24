@@ -25,7 +25,7 @@
   -->
 
   <!-- ============================================================ -->
-  <!--  Pre-SDK properties  (set BEFORE Microsoft.NET.Sdk import)    -->
+  <!--  Pre-SDK properties  (set BEFORE Microsoft.NET.Sdk import)   -->
   <!-- ============================================================ -->
   <PropertyGroup>
     <!--
@@ -42,14 +42,14 @@
   </PropertyGroup>
 
   <!-- ============================================================ -->
-  <!--  Import Microsoft.NET.Sdk base infrastructure                 -->
+  <!--  Import Microsoft.NET.Sdk base infrastructure                -->
   <!-- ============================================================ -->
   <Import Sdk="Microsoft.NET.Sdk" Project="Sdk.props" />
 
   <!-- ============================================================ -->
-  <!--  SDK root paths (used to locate bundled task DLLs and to       -->
-  <!--  redirect framework-directory resolution — consumed by the     -->
-  <!--  TFM module below and the MDP module in Sdk.targets)           -->
+  <!--  SDK root paths (used to locate bundled task DLLs and to     -->
+  <!--  redirect framework-directory resolution — consumed by the   -->
+  <!--  TFM module below and the MDP module in Sdk.targets)         -->
   <!-- ============================================================ -->
   <PropertyGroup>
     <_NfSdkDir>$(MSBuildThisFileDirectory)</_NfSdkDir>
@@ -57,13 +57,13 @@
   </PropertyGroup>
 
   <!-- ============================================================ -->
-  <!--  nanoFramework target-framework identity                      -->
-  <!--  (TFM moniker + compiler/TFM-shaping props)                   -->
+  <!--  nanoFramework target-framework identity                     -->
+  <!--  (TFM moniker + compiler/TFM-shaping props)                  -->
   <!-- ============================================================ -->
   <Import Project="$(MSBuildThisFileDirectory)nanoFramework.Tfm.props" />
 
   <!-- ============================================================ -->
-  <!--  Visual Studio / IDE settings                                 -->
+  <!--  Visual Studio / IDE settings                                -->
   <!-- ============================================================ -->
   <PropertyGroup>
     <EnableUnmanagedDebugging>false</EnableUnmanagedDebugging>
