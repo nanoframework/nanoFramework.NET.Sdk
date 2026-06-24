@@ -4,6 +4,11 @@
     <OutputType>Library</OutputType>
     <RootNamespace>SmokeTest</RootNamespace>
     <AssemblyName>SmokeTest</AssemblyName>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <_NanoMdpGenerateStubs>true</_NanoMdpGenerateStubs>
   </PropertyGroup>
 
   <ItemGroup>

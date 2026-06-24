@@ -11,15 +11,22 @@
              Incorrect changes will break .NET nanoFramework project builds.
     ********************************************************************************
 
-    Produces the deployable binary (GenerateBinaryOutputTask), copies the .pe /
-    .pdbx artifacts between the intermediate and output directories, and cleans
-    the generated nanoFramework files. These run after the MetadataProcessor has
-    emitted the .pe.
+    Produces the deployable binary (GenerateBinaryOutputTask), surfaces the native
+    methods checksum, copies the .pe / .pdbx artifacts to the output directory, and
+    cleans the generated nanoFramework files.
+
+    Ordering (hooked via AfterTargets, see nanoFramework.Mdp.targets):
+      GenerateNanoPeFile                         (.pe / .pdbx in intermediate dir)
+        -> NanoGenerateBinaryOutput              (deployable .bin; runs BEFORE the
+                                                  standard copy so a library's OutDir
+                                                  .dll is left intact afterwards)
+        -> NanoReportChecksum                    (surface $(NanoNativeMethodsChecksum))
+      CopyFilesToOutputDirectory (Microsoft.NET.Sdk)
+        -> NanoCopyOutputFiles                   (.pe / .pdbx -> OutDir)
+        -> _NanoCopyReferencesToIntermediate
 
     Imported by Sdk.targets AFTER nanoFramework.Mdp.targets, which defines the
-    shared $(_NanoBuildTasksDir) and $(_Nano*) properties used below and
-    wires these targets into the build pipeline (PrepareForRunDependsOn,
-    CleanDependsOn) and the NanoMetadataProcessor* targets (via CallTarget).
+    shared $(_NanoBuildTasksDir) and $(_Nano*) properties used below.
   -->
 
   <!-- nanoFramework binary-output task (bundled in SDK) -->
@@ -31,25 +38,46 @@
              AssemblyFile="$(NF_MSBUILDTASK_PATH)\nanoFramework.Tools.BuildTasks.dll" />
 
   <!-- ============================================================ -->
-  <!--  Clean targets                                               -->
+  <!--  Binary output                                               -->
+  <!--  Runs after the PE is emitted and BEFORE                     -->
+  <!--  CopyFilesToOutputDirectory: for executables it produces the -->
+  <!--  deployable .bin; for libraries it writes a transient blob   -->
+  <!--  over OutDir\<name>.dll which the standard copy then         -->
+  <!--  overwrites with the real managed assembly.                  -->
   <!-- ============================================================ -->
-  <Target Name="NanoClean">
-    <Delete Condition="EXISTS('$(OutDir)$(TargetName).pe')"   Files="$(OutDir)$(TargetName).pe" />
-    <Delete Condition="EXISTS('$(OutDir)$(TargetName).pdbx')" Files="$(OutDir)$(TargetName).pdbx" />
+  <Target Name="NanoGenerateBinaryOutput"
+          AfterTargets="GenerateNanoPeFile"
+          Condition="'$(DisableNanoMdp)' != 'true' and '$(NanoIsCoreLibrary)' != 'True'"
+          DependsOnTargets="ResolveReferences">
+    <GenerateBinaryOutputTask
+        AssemblyPE="$(_NanoIntermediateAssembly).pe"
+        Assembly="$(_NanoOutputAssembly)$(TargetExt)"
+        AssemblyReferences="@(ReferencePath);@(ReferenceDependencyPaths)">
+      <Output TaskParameter="FileWritten" ItemName="FileWrites" />
+    </GenerateBinaryOutputTask>
   </Target>
 
   <!-- ============================================================ -->
-  <!--  Copy targets                                                -->
+  <!--  Surface the native methods checksum                         -->
+  <!--  $(NanoNativeMethodsChecksum) is set by GenerateNanoPeFile.  -->
+  <!--  Emit it as a CI variable for external pipelines (the legacy -->
+  <!--  NF_NATIVE_ASSEMBLY_CHECKSUM contract is preserved).         -->
   <!-- ============================================================ -->
-  <Target Name="_NanoCopyAssemblyToOutDir">
-    <Copy Condition="Exists('$(IntermediateOutputPath)$(TargetFileName)')"
-          SourceFiles="$(IntermediateOutputPath)$(TargetFileName)"
-          DestinationFolder="$(OutDir)">
-      <Output TaskParameter="DestinationFiles" ItemName="FileWrites" />
-    </Copy>
+  <Target Name="NanoReportChecksum"
+          AfterTargets="GenerateNanoPeFile"
+          Condition="'$(NanoNativeMethodsChecksum)' != '' and '$(NanoNativeMethodsChecksum)' != '0x00000000'">
+    <Message Text="##vso[task.setvariable variable=NF_NATIVE_ASSEMBLY_CHECKSUM;]$(NanoNativeMethodsChecksum)"
+             Condition="'$(TF_BUILD)' == 'True'" />
+    <WriteLinesToFile File="$(GITHUB_ENV)" Lines="NF_NATIVE_ASSEMBLY_CHECKSUM=$(NanoNativeMethodsChecksum)"
+                      Condition="'$(GITHUB_ACTIONS)' == 'True'" />
   </Target>
 
-  <Target Name="NanoCopyOutputFiles">
+  <!-- ============================================================ -->
+  <!--  Copy targets (run after the standard output copy)           -->
+  <!-- ============================================================ -->
+  <Target Name="NanoCopyOutputFiles"
+          AfterTargets="CopyFilesToOutputDirectory"
+          Condition="'$(DisableNanoMdp)' != 'true'">
     <Copy Condition="Exists('$(_NanoIntermediateAssembly).pe')"
           SourceFiles="$(_NanoIntermediateAssembly).pe"
           DestinationFiles="$(_NanoOutputAssembly).pe" SkipUnchangedFiles="true">
@@ -72,7 +100,9 @@
     </Copy>
   </Target>
 
-  <Target Name="_NanoCopyReferencesToIntermediate">
+  <Target Name="_NanoCopyReferencesToIntermediate"
+          AfterTargets="CopyFilesToOutputDirectory"
+          Condition="'$(DisableNanoMdp)' != 'true'">
     <Copy SourceFiles="@(ReferenceCopyLocalPaths)"
           DestinationFiles="@(ReferenceCopyLocalPaths->'$(IntermediateOutputPath)%(Filename)%(Extension)')"
           SkipUnchangedFiles="false">
@@ -81,21 +111,16 @@
   </Target>
 
   <!-- ============================================================ -->
-  <!--  Binary output                                               -->
+  <!--  Clean targets                                               -->
   <!-- ============================================================ -->
-  <Target Name="NanoGenerateBinaryOutput"
-          DependsOnTargets="ResolveReferences">
-    <GenerateBinaryOutputTask
-        AssemblyPE="$(_NanoIntermediateAssembly).pe"
-        Assembly="$(_NanoOutputAssembly)$(TargetExt)"
-        AssemblyReferences="@(ReferencePath);@(ReferenceDependencyPaths)">
-      <Output TaskParameter="FileWritten" ItemName="FileWrites" />
-    </GenerateBinaryOutputTask>
+  <Target Name="NanoClean">
+    <Delete Condition="EXISTS('$(OutDir)$(TargetName).pe')"   Files="$(OutDir)$(TargetName).pe" />
+    <Delete Condition="EXISTS('$(OutDir)$(TargetName).pdbx')" Files="$(OutDir)$(TargetName).pdbx" />
   </Target>
 
   <!-- Clean extra files for core assembly builds -->
   <Target Name="_NanoCleanExtraFiles" Condition="'$(NanoIsCoreLibrary)' == 'True'">
-    <Delete Files="$(_NanoMdpCompileOutput);$(_NanoMdpCompileOutputNoExt).pdbx;$(_NanoMdpDumpExportsFile);$(_NanoMdpDependencyMapFile)"
+    <Delete Files="$(_NanoMdpCompileOutput);$(_NanoMdpCompileOutputNoExt).pdbx;$(_NanoMdpDumpExportsFile);$(_NanoMdpDependencyMapFile);$(_NanoMdpSaveStringsFile)"
             TreatErrorsAsWarnings="true" />
   </Target>
 
