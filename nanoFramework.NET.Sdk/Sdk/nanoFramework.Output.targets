@@ -127,10 +127,14 @@
     <Delete Condition="EXISTS('$(OutDir)$(TargetName).pdbx')" Files="$(OutDir)$(TargetName).pdbx" />
   </Target>
 
-  <!-- Clean extra files for core assembly builds -->
-  <Target Name="_NanoCleanExtraFiles" Condition="'$(NanoIsCoreLibrary)' == 'True'">
+  <!-- Clean extra files for core assembly builds and projects generating stubs -->
+  <Target Name="_NanoCleanExtraFiles"
+          AfterTargets="Clean"
+          Condition="'$(NanoIsCoreLibrary)' == 'True' or '$(NanoMdpGenerateStubs)' == 'true'">
     <Delete Files="$(_NanoMdpCompileOutput);$(_NanoMdpCompileOutputNoExt).pdbx;$(_NanoMdpDumpExportsFile);$(_NanoMdpDependencyMapFile);$(_NanoMdpSaveStringsFile)"
             TreatErrorsAsWarnings="true" />
+    <RemoveDir Condition="Exists('$(NanoGenerateStubsDirectory)')"
+               Directories="$(NanoGenerateStubsDirectory)" />
   </Target>
 
   <!-- Suppress manifest/config copy -->

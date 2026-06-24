@@ -195,9 +195,6 @@
     <ResolveReferencesDependsOn>$(ResolveReferencesDependsOn);ResolveRuntimeDependencies</ResolveReferencesDependsOn>
     <PrepareResourcesDependsOn>$(PrepareResourcesDependsOn);NanoGenerateResources</PrepareResourcesDependsOn>
   </PropertyGroup>
-  <PropertyGroup Condition="'$(NanoIsCoreLibrary)' == 'True'">
-    <CleanDependsOn>$(CleanDependsOn);_NanoCleanExtraFiles</CleanDependsOn>
-  </PropertyGroup>
 
   <!-- ============================================================ -->
   <!--  GenerateNanoPeFile — the single PE-emit stage               -->
