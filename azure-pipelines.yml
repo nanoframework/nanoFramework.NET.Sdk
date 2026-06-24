@@ -173,6 +173,7 @@ stages:
 
     - task: DotNetCoreCLI@2
       displayName: Pack
+      condition: succeeded()
       inputs:
         command: 'pack'
         packagesToPack: '**/nanoFramework.NET.Sdk.csproj'

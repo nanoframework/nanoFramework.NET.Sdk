@@ -11,7 +11,8 @@
   "publicReleaseRefSpec": [
     "^refs/heads/develop$",
     "^refs/heads/main$",
-    "^refs/heads/v\\d+(?:\\.\\d+)?$"
+    "^refs/heads/v\\d+(?:\\.\\d+)?$",
+    "^refs/pull/\\d+/merge$"
   ],
   "cloudBuild": {
     "setAllVariables": true
