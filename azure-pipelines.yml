@@ -211,6 +211,37 @@ stages:
       inputs:
         targetType: inline
         script: |
+          $sdkPackage = Get-ChildItem -Path "$(Build.ArtifactStagingDirectory)" -Filter "nanoFramework.NET.Sdk.*.nupkg" -File |
+            Where-Object { $_.Name -notlike "*.snupkg" -and $_.Name -notlike "*.symbols.nupkg" } |
+            Sort-Object LastWriteTime -Descending |
+            Select-Object -First 1
+
+          if (-not $sdkPackage)
+          {
+            throw "Couldn't find nanoFramework.NET.Sdk package in $(Build.ArtifactStagingDirectory)."
+          }
+
+          $match = [regex]::Match($sdkPackage.BaseName, '^nanoFramework\.NET\.Sdk\.(.+)$')
+
+          if (-not $match.Success)
+          {
+            throw "Couldn't infer SDK version from package '$($sdkPackage.Name)'."
+          }
+
+          $sdkVersion = $match.Groups[1].Value
+          Write-Host "Using SmokeTest SDK package: $($sdkPackage.Name)"
+          Write-Host "Using SmokeTest SDK version: $sdkVersion"
+
+          $smokeGlobalJson = @(
+            '{'
+            '  "msbuild-sdks": {'
+            "    ""nanoFramework.NET.Sdk"": ""$sdkVersion"""
+            '  }'
+            '}'
+          )
+
+          $smokeGlobalJson | Set-Content -Path "$(Build.SourcesDirectory)/test/SmokeTest/global.json" -Encoding utf8
+
           $nugetConfig = @(
             '<?xml version="1.0" encoding="utf-8"?>'
             '<configuration>'
@@ -219,9 +250,17 @@ stages:
             '    <add key="local-sdk" value="$(Build.ArtifactStagingDirectory)" />'
             '    <add key="nuget.org" value="https://api.nuget.org/v3/index.json" />'
             '  </packageSources>'
+            '  <packageSourceMapping>'
+            '    <packageSource key="local-sdk">'
+            '      <package pattern="nanoFramework.NET.Sdk" />'
+            '    </packageSource>'
+            '    <packageSource key="nuget.org">'
+            '      <package pattern="*" />'
+            '    </packageSource>'
+            '  </packageSourceMapping>'
             '</configuration>'
           )
-          $nugetConfig | Set-Content -Path "$(Build.SourcesDirectory)/test/SmokeTest/NuGet.Azdo.Config"
+          $nugetConfig | Set-Content -Path "$(Build.SourcesDirectory)/test/SmokeTest/NuGet.Azdo.Config" -Encoding utf8
 
     - task: DotNetCoreCLI@2
       displayName: Restore SmokeTest
