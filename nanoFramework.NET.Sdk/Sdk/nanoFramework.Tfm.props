@@ -29,6 +29,11 @@
     <!-- Disable .NET framework reference resolution — nanoFramework has its own mscorlib -->
     <DisableImplicitFrameworkReferences>true</DisableImplicitFrameworkReferences>
 
+    <!-- Allow NuGet to resolve transitive dependencies from packages targeting standard frameworks.
+         net472 covers build-tool packages (SourceLink, Nerdbank.GitVersioning, etc.);
+         netstandard2.0 covers most nanoFramework-compatible library packages. -->
+    <AssetTargetFallback>$(AssetTargetFallback);net472;netstandard2.0</AssetTargetFallback>
+
     <!-- Suppress NU1701 warning for the expected fallback -->
     <NoWarn>$(NoWarn);NU1701</NoWarn>
   </PropertyGroup>
