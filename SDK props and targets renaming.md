@@ -79,7 +79,6 @@ renames are local — except the external contracts listed in "Do NOT rename" be
 | `NFMDP_PE_SaveStrings` | `_NanoMdpSaveStringsFile` |
 | `NFMDP_PE_DumpExports` | `_NanoMdpDumpExportsFile` |
 | `NFMDP_PE_GenerateDependency` | `_NanoMdpDependencyMapFile` |
-| `@(NFMDP_PE_ExcludeClassByName)` | `@(_NanoMdpExcludeClassByName)` |
 | `@(NFMDP_PE_LoadHints)` | `@(_NanoMdpLoadHints)` |
 | `NFMDP_STUB_GenerateSkeletonProject` | `_NanoMdpStubSkeletonProject` |
 | `NFMDP_STUB_GenerateSkeletonName` | `_NanoMdpStubSkeletonName` |

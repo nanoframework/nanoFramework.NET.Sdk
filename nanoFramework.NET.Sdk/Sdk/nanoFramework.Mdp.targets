@@ -228,7 +228,6 @@
         GenerateSkeletonName="$(_NanoMdpStubSkeletonName)"
         GenerateSkeletonProject="$(_NanoMdpStubSkeletonProject)"
         SkeletonWithoutInterop="$(_NanoMdpStubSkeletonWithoutInterop)"
-        ExcludeClassByName="@(_NanoMdpExcludeClassByName)"
         LoadHints="@(ReferencePath);@(ReferenceDependencyPaths);@(ReferenceSatellitePaths)"
         ImportResources="@(_NanoResources)">
       <Output TaskParameter="FilesWritten" ItemName="FileWrites" />
