@@ -36,20 +36,26 @@
   </PropertyGroup>
 
   <!-- ============================================================= -->
-  <!--  Core assembly (mscorlib) special settings                    -->
-  <!--  mscorlib cannot reference itself, so suppress auto-generated -->
-  <!--  assembly attributes that pull in System.* types.             -->
-  <!--  These must be BEFORE Microsoft.NET.Sdk import but in targets -->
-  <!--  (not props) because NanoIsCoreLibrary is set in the project  -->
-  <!--  file, which is evaluated after Sdk.props but before targets. -->
+  <!--  mscorlib-only special settings                               -->
+  <!--  These apply ONLY when building mscorlib itself (NanoIsMscorlib),
+        NOT to other core libraries (NanoIsCoreLibrary, e.g. native    -->
+  <!--  libraries like System.Device.Gpio or System.Math). mscorlib    -->
+  <!--  cannot reference itself, so suppress auto-generated assembly   -->
+  <!--  attributes that pull in System.* types, and give Roslyn the    -->
+  <!--  runtimemetadataversion. Other core libraries reference         -->
+  <!--  mscorlib normally and must keep these.                         -->
+  <!--  These must be BEFORE Microsoft.NET.Sdk import but in targets   -->
+  <!--  (not props) because NanoIsMscorlib is set in the project file, -->
+  <!--  which is evaluated after Sdk.props but before targets.         -->
   <!-- ============================================================= -->
 
-  <!-- Back-compat: the legacy core-assembly flag was IsCoreAssembly; honor it -->
+  <!-- mscorlib is itself a core library, so building it implies the -->
+  <!-- core-library MDP pipeline (no-interop skeleton, stubs, etc.). -->
   <PropertyGroup>
-    <NanoIsCoreLibrary Condition="'$(NanoIsCoreLibrary)' == '' and '$(IsCoreAssembly)' != ''">$(IsCoreAssembly)</NanoIsCoreLibrary>
+    <NanoIsCoreLibrary Condition="'$(NanoIsCoreLibrary)' == '' and '$(NanoIsMscorlib)' == 'True'">true</NanoIsCoreLibrary>
   </PropertyGroup>
 
-  <PropertyGroup Condition="'$(NanoIsCoreLibrary)' == 'True'">
+  <PropertyGroup Condition="'$(NanoIsMscorlib)' == 'True'">
     <GenerateAssemblyCompanyAttribute>false</GenerateAssemblyCompanyAttribute>
     <GenerateAssemblyConfigurationAttribute>false</GenerateAssemblyConfigurationAttribute>
     <GenerateAssemblyFileVersionAttribute>false</GenerateAssemblyFileVersionAttribute>
@@ -59,7 +65,7 @@
     <GenerateAssemblyVersionAttribute>false</GenerateAssemblyVersionAttribute>
     <GenerateNeutralResourcesLanguageAttribute>false</GenerateNeutralResourcesLanguageAttribute>
     <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
-    <!-- Roslyn requires runtimemetadataversion when building core assembly -->
+    <!-- Roslyn requires runtimemetadataversion when building mscorlib -->
     <CompilerResponseFile>$(ProjectDir)coreAssembly.rsp</CompilerResponseFile>
   </PropertyGroup>
 

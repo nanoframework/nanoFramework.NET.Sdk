@@ -12,8 +12,10 @@ Those files accreted **four** different naming styles for symbols and properties
 - `NFMDP_XXX_Yyy` — SCREAMING_SNAKE with the `NF`/`MDP` abbreviations (carried over from the
   legacy NFProjectSystem targets)
 
-Plus two casing slips: the target `MetaDataProcessor` (should be `Metadata`, one word) and two
-different names for the same concept — `IsCoreAssembly` and `NanoIsCoreLibrary`.
+Plus a casing slip: the target `MetaDataProcessor` (should be `Metadata`, one word). The legacy
+`IsCoreAssembly` and `NanoIsCoreLibrary` were originally treated as the same concept, but they are
+not (see section D): `NanoIsCoreLibrary` is the broad core-library flag, while the mscorlib-only
+build mechanics live on a separate `NanoIsMscorlib` flag.
 
 The goal is a single, descriptive, .NET-SDK-consistent convention without breaking anyone:
 
@@ -94,11 +96,23 @@ renames are local — except the external contracts listed in "Do NOT rename" be
 |---|---|---|
 | `NanoFrameworkMDPVersion` | `NanoMdpVersion` | yes |
 | `NanoIsCoreLibrary` | unchanged | — |
+| `IsCoreAssembly` | `NanoIsMscorlib` (mscorlib-only mechanics; see below) | no |
 | `NanoGenerateStubsDirectory` / `…StubsRootName` / `…SkeletonProjectName` / `…SkeletonFile` | unchanged (already on-convention) | — |
 
-`IsCoreAssembly` (Sdk.targets) and `NanoIsCoreLibrary` are the **same concept** (project builds
-mscorlib). Consolidate on `NanoIsCoreLibrary`; keep `IsCoreAssembly` as a fallback alias since the
-mscorlib build may set it externally.
+`NanoIsCoreLibrary` and `NanoIsMscorlib` are **two distinct concepts**, not one:
+
+- `NanoIsCoreLibrary` (legacy `NF_IsCoreLibrary`) — an official core library with native firmware
+  support and **no Interop layer**. Drives the MDP `IsCoreLibrary` parameter, `SkeletonWithoutInterop`,
+  and stub/dump/dependency/strings generation. Set by mscorlib **and** other native core libraries
+  (e.g. `System.Device.Gpio`, `nanoFramework.System.Math`, `nanoFramework.Runtime.Native`).
+- `NanoIsMscorlib` (legacy `IsCoreAssembly`) — the project builds **mscorlib itself**. Because
+  mscorlib cannot reference itself, this suppresses the auto-generated assembly attributes that pull
+  in `System.*` types and points Roslyn at `coreAssembly.rsp` for the `runtimemetadataversion`. These
+  settings must NOT apply to other core libraries, which reference mscorlib normally.
+
+Building mscorlib implies the core-library pipeline, so `NanoIsMscorlib == True` seeds
+`NanoIsCoreLibrary` when the project has not set it explicitly. No legacy fallback aliases are kept;
+projects migrate to the new names directly.
 
 ### E. Target names → PascalCase, `Nano` namespace, `Metadata` casing fix
 
@@ -153,7 +167,7 @@ so an existing `.csproj` setting still wins:
 ```
 
 Same shape for `NanoMdpVerboseMinimize` ← `NFMDP_PE_VerboseMinimize`, `NanoMdpVersion` ←
-`NanoFrameworkMDPVersion` and `NanoIsCoreLibrary` ← `IsCoreAssembly`.
+and `NanoFrameworkMDPVersion`. (`NanoIsCoreLibrary` / `NanoIsMscorlib` keep no legacy fallback.)
 
 ## Files touched
 
