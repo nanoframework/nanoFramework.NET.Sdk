@@ -37,16 +37,16 @@
 
   <!-- ============================================================= -->
   <!--  mscorlib-only special settings                               -->
-  <!--  These apply ONLY when building mscorlib itself (NanoIsMscorlib),
-        NOT to other core libraries (NanoIsCoreLibrary, e.g. native    -->
-  <!--  libraries like System.Device.Gpio or System.Math). mscorlib    -->
-  <!--  cannot reference itself, so suppress auto-generated assembly   -->
-  <!--  attributes that pull in System.* types, and give Roslyn the    -->
-  <!--  runtimemetadataversion. Other core libraries reference         -->
-  <!--  mscorlib normally and must keep these.                         -->
-  <!--  These must be BEFORE Microsoft.NET.Sdk import but in targets   -->
-  <!--  (not props) because NanoIsMscorlib is set in the project file, -->
-  <!--  which is evaluated after Sdk.props but before targets.         -->
+  <!--  These apply ONLY when building mscorlib itself (NanoIsMscorlib),-->
+  <!--  NOT to other core libraries (NanoIsCoreLibrary, e.g. native  -->
+  <!--  libraries like System.Device.Gpio or System.Math). mscorlib  -->
+  <!--  cannot reference itself, so suppress auto-generated assembly  -->
+  <!--  attributes that pull in System.* types and set                -->
+  <!--  RuntimeMetadataVersion so Roslyn (csc) does not fail with     -->
+  <!--  CS8021.                                                       -->
+  <!--  These must be BEFORE Microsoft.NET.Sdk import but in targets  -->
+  <!--  (not props) because NanoIsMscorlib is set in the project file,-->
+  <!--  which is evaluated after Sdk.props but before targets.        -->
   <!-- ============================================================= -->
 
   <!-- mscorlib is itself a core library, so building it implies the -->
@@ -65,8 +65,11 @@
     <GenerateAssemblyVersionAttribute>false</GenerateAssemblyVersionAttribute>
     <GenerateNeutralResourcesLanguageAttribute>false</GenerateNeutralResourcesLanguageAttribute>
     <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
-    <!-- Roslyn requires runtimemetadataversion when building mscorlib -->
-    <CompilerResponseFile>$(ProjectDir)coreAssembly.rsp</CompilerResponseFile>
+    <!-- Roslyn requires a runtimemetadataversion value when building mscorlib (the assembly that
+         defines System.Object) because it has no corlib reference to read the version from.
+         The value v4.0.30319 is the standard placeholder it is written into the intermediate managed PE 
+         but the MetadataProcessor replaces it in the final nano PE, and nanoCLR never reads it. -->
+    <RuntimeMetadataVersion Condition="'$(RuntimeMetadataVersion)' == ''">v4.0.30319</RuntimeMetadataVersion>
   </PropertyGroup>
 
   <!-- ============================================================ -->

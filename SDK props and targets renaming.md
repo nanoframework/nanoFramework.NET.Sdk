@@ -107,8 +107,9 @@ renames are local — except the external contracts listed in "Do NOT rename" be
   (e.g. `System.Device.Gpio`, `nanoFramework.System.Math`, `nanoFramework.Runtime.Native`).
 - `NanoIsMscorlib` (legacy `IsCoreAssembly`) — the project builds **mscorlib itself**. Because
   mscorlib cannot reference itself, this suppresses the auto-generated assembly attributes that pull
-  in `System.*` types and points Roslyn at `coreAssembly.rsp` for the `runtimemetadataversion`. These
-  settings must NOT apply to other core libraries, which reference mscorlib normally.
+  in `System.*` types and sets `RuntimeMetadataVersion` so Roslyn does not fail with CS8021
+  (replaces the legacy `coreAssembly.rsp` mechanism). These settings must NOT apply to other core
+  libraries, which reference mscorlib normally.
 
 Building mscorlib implies the core-library pipeline, so `NanoIsMscorlib == True` seeds
 `NanoIsCoreLibrary` when the project has not set it explicitly. No legacy fallback aliases are kept;
