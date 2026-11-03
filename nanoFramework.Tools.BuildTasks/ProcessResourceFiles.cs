@@ -207,6 +207,12 @@ namespace nanoFramework.Tools
                 logger.LogError(null, inFile, xe.LineNumber, xe.LinePosition, 0, 0, "General.InvalidResxFile", xe.Message);
                 return false;
             }
+            catch (Exception e) when (e is IOException || e is UnauthorizedAccessException)
+            {
+                // failed to read a file linked in the resx
+                logger.LogError(null, null, null, inFile, 0, 0, 0, 0, "Cannot read linked resource file: {0}", e.Message);
+                return false;
+            }
 #if MSBUILD_SOURCES
             catch (Exception e)
             {
@@ -453,6 +459,38 @@ namespace nanoFramework.Tools
             }
 
             StronglyTypedResourceSuccessfullyCreated = true;
+        }
+
+        /// <summary>
+        /// Generates the C# strongly typed resource class for a .resx file and returns it as a string.
+        /// Used by the build task, which runs this in a separate AppDomain (on .NET Framework), where a CodeDomProvider
+        /// and TextWriter can't be passed across the boundary.
+        /// </summary>
+        public string CreateStronglyTypedResourcesCode(string inputFileName, string className, string classNamespace)
+        {
+            StronglyTypedClassName = className;
+            StronglyTypedNamespace = classNamespace;
+
+            string resourceName = string.IsNullOrEmpty(classNamespace) ? className : $"{classNamespace}.{className}";
+
+            // CodeDom localizes the auto-generated header to the UI culture, keep it stable regardless of the machine language
+            CultureInfo uiCulture = System.Threading.Thread.CurrentThread.CurrentUICulture;
+            System.Threading.Thread.CurrentThread.CurrentUICulture = CultureInfo.InvariantCulture;
+
+            try
+            {
+                using (CodeDomProvider provider = new Microsoft.CSharp.CSharpCodeProvider())
+                using (StringWriter writer = new StringWriter(CultureInfo.InvariantCulture))
+                {
+                    CreateStronglyTypedResources(inputFileName, provider, writer, resourceName);
+
+                    return writer.ToString();
+                }
+            }
+            finally
+            {
+                System.Threading.Thread.CurrentThread.CurrentUICulture = uiCulture;
+            }
         }
 
         /// <summary>
@@ -762,16 +800,22 @@ namespace nanoFramework.Tools
         {
             using (reader)
             {
+#if NETFRAMEWORK
+                ResXResourceReader resXReader = reader as ResXResourceReader;
+
+                if (resXReader != null)
+                {
+                    // get data nodes instead of the deserialized values so linked files can be read as raw bytes
+                    // regardless of the type that the resource editor declared for them
+                    resXReader.UseResXDataNodes = true;
+                }
+#endif
+
                 IDictionaryEnumerator resEnum = reader.GetEnumerator();
                 while (resEnum.MoveNext())
                 {
-                    string name = (string)resEnum.Key;
-                    // Replace dot in the name with underscore.
-                    // 1. First reason  - this is what desktop resource generator does.
-                    // 2. Second reason - Extra dots causes resource generator to create name space and enumerations.
-                    //    This complicates the syntax and finally create invalid code if 2 or more dots are present.
-                    //    So we just make longer name.
-                    name = name.Replace('.', '_');
+                    string originalName = (string)resEnum.Key;
+                    string name = SanitizeResourceName(originalName);
                     object value;
                     try
                     {
@@ -779,15 +823,85 @@ namespace nanoFramework.Tools
                     }
                     catch (Exception ex)
                     {
-                        logger?.LogWarning(null, fileName, 0, 0, 0, 0, "GenerateResource.CannotLoadResource", (string)resEnum.Key, ex.Message);
+                        logger?.LogWarning(null, null, null, fileName, 0, 0, 0, 0, "Cannot load resource '{0}': {1}", originalName, ex.Message);
                         continue;
                     }
-                    AddResource(name, value, fileName);
+
+#if NETFRAMEWORK
+                    if (value is ResXDataNode dataNode)
+                    {
+                        // failures reading linked files are errors, let them reach ProcessFile
+                        value = GetDataNodeValue(dataNode, resXReader?.BasePath, fileName);
+                    }
+#endif
+
+                    AddResource(name, value, fileName, originalName);
                 }
             }
 
             EnsureResourcesIds(resources);
         }
+
+        /// <summary>
+        /// Makes a resource name usable as an identifier in the strongly typed resource class.
+        /// An optional ";id" suffix is preserved.
+        /// </summary>
+        internal static string SanitizeResourceName(string name)
+        {
+            int idSeparator = name.IndexOf(';');
+            string baseName = idSeparator >= 0 ? name.Substring(0, idSeparator) : name;
+            string idSuffix = idSeparator >= 0 ? name.Substring(idSeparator) : string.Empty;
+
+            // Replace dots (and any other character that isn't valid in an identifier) with underscore.
+            // 1. First reason  - this is what desktop resource generator does.
+            // 2. Second reason - Extra dots causes resource generator to create name space and enumerations.
+            //    This complicates the syntax and finally create invalid code if 2 or more dots are present.
+            //    So we just make longer name.
+            // 3. Third reason  - newer VS resource editors keep names as typed (e.g. with '-' or spaces).
+            StringBuilder sanitizedName = new StringBuilder(baseName.Length + 1);
+
+            foreach (char c in baseName)
+            {
+                sanitizedName.Append(char.IsLetterOrDigit(c) || c == '_' ? c : '_');
+            }
+
+            if (sanitizedName.Length > 0 && char.IsDigit(sanitizedName[0]))
+            {
+                sanitizedName.Insert(0, '_');
+            }
+
+            return sanitizedName.ToString() + idSuffix;
+        }
+
+#if NETFRAMEWORK
+        /// <summary>
+        /// Gets the value of a resx data node.
+        /// Linked files that aren't text are read as raw bytes, ignoring the type declared in the resx.
+        /// Depending on the VS version, the resource editor declares images as System.Drawing.Bitmap or as System.Byte[].
+        /// </summary>
+        private object GetDataNodeValue(ResXDataNode dataNode, string basePath, string fileName)
+        {
+            ResXFileRef fileRef = dataNode.FileRef;
+
+            if (fileRef != null
+                && !fileRef.TypeName.StartsWith(typeof(string).FullName + ",", StringComparison.Ordinal)
+                && fileRef.TypeName != typeof(string).FullName)
+            {
+                string linkedFilePath = fileRef.FileName;
+
+                if (!Path.IsPathRooted(linkedFilePath))
+                {
+                    linkedFilePath = Path.Combine(basePath ?? Path.GetDirectoryName(Path.GetFullPath(fileName)), linkedFilePath);
+                }
+
+                return File.ReadAllBytes(linkedFilePath);
+            }
+
+            return assemblyList != null
+                ? dataNode.GetValue(assemblyList)
+                : dataNode.GetValue((System.ComponentModel.Design.ITypeResolutionService)null);
+        }
+#endif
 
         private static short GenerateIdFromResourceName(string s)
         {
@@ -932,11 +1046,19 @@ namespace nanoFramework.Tools
         /// <param name="inputFileName">Input file for messages</param>
         /// <param name="lineNumber">Line number for messages</param>
         /// <param name="linePosition">Column number for messages</param>
-        private void AddResource(string name, object value, String inputFileName, int lineNumber, int linePosition)
+        /// <param name="originalName">Resource name before sanitization, for messages</param>
+        private void AddResource(string name, object value, String inputFileName, int lineNumber, int linePosition, string originalName = null)
         {
             if (resourcesHashTable.ContainsKey(name))
             {
-                logger?.LogWarning(null, inputFileName, lineNumber, linePosition, 0, 0, "GenerateResource.DuplicateResourceName", name);
+                if (originalName != null && originalName != name)
+                {
+                    logger?.LogWarning(null, null, null, inputFileName, lineNumber, linePosition, 0, 0, "Duplicate resource name '{0}' (originally '{1}'). Resource ignored.", name, originalName);
+                }
+                else
+                {
+                    logger?.LogWarning(null, null, null, inputFileName, lineNumber, linePosition, 0, 0, "Duplicate resource name '{0}'. Resource ignored.", name);
+                }
                 return;
             }
 
@@ -957,9 +1079,9 @@ namespace nanoFramework.Tools
             resourcesHashTable[name] = entry;
         }
 
-        private void AddResource(string name, object value, String inputFileName)
+        private void AddResource(string name, object value, String inputFileName, string originalName = null)
         {
-            AddResource(name, value, inputFileName, 0, 0);
+            AddResource(name, value, inputFileName, 0, 0, originalName);
         }
 
         /// <summary>
@@ -1014,51 +1136,31 @@ namespace nanoFramework.Tools
                         break;
 
                     case "Byte[]":
-                        byte[] rawValue = value as byte[];
-                        // read raw content so it can be saved as a binary entry resource (byte[])
-#if NETFRAMEWORK
-                        Bitmap bitmapImage = null;
-                        bool imageJPeg = false;
-                        bool imageGif = false;
-                        bool imageBmp = false;
-                        try
-                        {
-                            bitmapImage = Image.FromStream(new MemoryStream(rawValue)) as Bitmap;
-                            imageJPeg = bitmapImage.RawFormat.Equals(ImageFormat.Jpeg);
-                            imageGif = bitmapImage.RawFormat.Equals(ImageFormat.Gif);
-                            imageBmp = bitmapImage.RawFormat.Equals(ImageFormat.Bmp);
-                        }
-                        catch
-                        {
-                            // Ignore error if not a known supported bitmap
-                        }
-                        if (imageJPeg || imageGif || imageBmp)
-                        {
-                            entry = new BitmapEntry(name, bitmapImage);
-                        }
-#else
-                        if (rawValue != null && CrossPlatformBitmap.IsSupportedBitmap(rawValue))
-                        {
-                            entry = new BitmapEntry(name, rawValue);
-                        }
-#endif
-                        else if (rawValue != null)
-                        {
-                            // This code handles fonts which have a resource header starting with a Magic Number
-                            // followed by a number of resources, e.g. each font letter etc...
-                            entry = NanoResourcesEntry.TryCreateNanoResourcesEntry(name, rawValue);
+                        entry = CreateEntryFromBytes(name, value as byte[]);
+                        break;
 
-                            // If just a byte array, create a Binary Resource
-                            if (entry == null)
-                            {
-                                // Create BinaryEntry
-                                using (var ms = new MemoryStream(rawValue))
-                                {
-                                    entry = new BinaryEntry(name, rawValue);
-                                }
-                            }
+#if NETFRAMEWORK
+                    case "Bitmap":
+                        // images embedded in the resx (not linked files) that were deserialized as System.Drawing.Bitmap
+                        using (MemoryStream bitmapStream = new MemoryStream())
+                        {
+                            Bitmap bitmapValue = (Bitmap)value;
+                            ImageFormat bitmapFormat = bitmapValue.RawFormat.Equals(ImageFormat.MemoryBmp) ? ImageFormat.Bmp : bitmapValue.RawFormat;
+                            bitmapValue.Save(bitmapStream, bitmapFormat);
+                            entry = CreateEntryFromBytes(name, bitmapStream.ToArray());
                         }
                         break;
+
+                    case "Icon":
+                        // icons embedded in the resx (not linked files) that were deserialized as System.Drawing.Icon
+                        using (MemoryStream iconStream = new MemoryStream())
+                        {
+                            ((Icon)value).Save(iconStream);
+                            entry = CreateEntryFromBytes(name, iconStream.ToArray());
+                        }
+                        break;
+#endif
+
                     case "MemoryStream":
                         // Examples  - .wav
                         // this is a binary resource
@@ -1072,7 +1174,7 @@ namespace nanoFramework.Tools
 
                 if (entry == null)
                 {
-                    throw new Exception($"Resource '{name}' has unsupported type '{value.GetType().FullName}'.");
+                    throw new Exception($"Resource '{name}' has unsupported type '{value.GetType().FullName}'. Supported: strings, byte[] and linked files.");
                 }
 
                 if (entry.Namespace.Length == 0)
@@ -1092,6 +1194,49 @@ namespace nanoFramework.Tools
                 }
 
                 return entry;
+            }
+
+            private static Entry CreateEntryFromBytes(string name, byte[] rawValue)
+            {
+                if (rawValue == null)
+                {
+                    return null;
+                }
+
+                // read raw content so it can be saved as a binary entry resource (byte[])
+#if NETFRAMEWORK
+                Bitmap bitmapImage = null;
+                bool imageJPeg = false;
+                bool imageGif = false;
+                bool imageBmp = false;
+                try
+                {
+                    bitmapImage = Image.FromStream(new MemoryStream(rawValue)) as Bitmap;
+                    imageJPeg = bitmapImage.RawFormat.Equals(ImageFormat.Jpeg);
+                    imageGif = bitmapImage.RawFormat.Equals(ImageFormat.Gif);
+                    imageBmp = bitmapImage.RawFormat.Equals(ImageFormat.Bmp);
+                }
+                catch
+                {
+                    // Ignore error if not a known supported bitmap
+                }
+
+                if (imageJPeg || imageGif || imageBmp)
+                {
+                    return new BitmapEntry(name, bitmapImage);
+                }
+#else
+                if (CrossPlatformBitmap.IsSupportedBitmap(rawValue))
+                {
+                    return new BitmapEntry(name, rawValue);
+                }
+#endif
+
+                // This code handles fonts which have a resource header starting with a Magic Number
+                // followed by a number of resources, e.g. each font letter etc...
+                // If just a byte array, create a Binary Resource
+                return (Entry)NanoResourcesEntry.TryCreateNanoResourcesEntry(name, rawValue)
+                    ?? new BinaryEntry(name, rawValue);
             }
 
             private bool ParseId(string val, out short id)
@@ -1187,7 +1332,7 @@ namespace nanoFramework.Tools
 
             public string Name
             {
-                get { return string.Format("{0}.{1}.{2};0x{3}", Namespace, ClassName, field, Id.ToString("X4")); }
+                get { return string.Format("{0}.{1}.{2};0x{3}", Namespace, ClassName, this.field, Id.ToString("X4")); }
             }
 
             public string RawName
@@ -1205,8 +1350,8 @@ namespace nanoFramework.Tools
 
             public string Field
             {
-                get { return field; }
-                set { field = value; }
+                get { return this.field; }
+                set { this.field = value; }
             }
 
             #region IComparable Members

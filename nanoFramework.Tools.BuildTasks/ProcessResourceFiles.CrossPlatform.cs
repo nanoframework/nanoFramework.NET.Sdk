@@ -10,8 +10,8 @@
 // equivalents used when the build task runs on modern .NET:
 //
 //   * NanoResxResourceReader - a focused .resx reader covering the cases the
-//     nanoFramework pipeline uses (inline strings, ResXFileRef byte[]/string,
-//     and base64 byte-array blobs).
+//     nanoFramework pipeline uses (inline strings, ResXFileRef linked files read
+//     as string or raw bytes whatever type they declare, and base64 byte-array blobs).
 //   * CrossPlatformBitmap - bitmap decoding + RGB565 conversion via ImageSharp,
 //     producing the exact CLR_GFX_BitmapDescription + payload the nanoCLR expects.
 //
@@ -37,7 +37,7 @@ namespace nanoFramework.Tools
     /// Minimal cross-platform .resx reader.
     /// Implements just enough of the .resx schema for the nanoFramework resource
     /// pipeline: inline string values, <see cref="System.Resources.ResXFileRef"/>
-    /// style file references (resolved to <c>byte[]</c> or <c>string</c>), and
+    /// style file references (resolved to <c>string</c> for text, otherwise to <c>byte[]</c>), and
     /// inline base64 byte arrays. Anything requiring runtime type activation
     /// (BinaryFormatter-serialized objects) is reported as unsupported.
     /// </summary>
@@ -147,12 +147,10 @@ namespace nanoFramework.Tools
                 return File.ReadAllText(resolvedPath, encoding);
             }
 
-            if (IsMemoryStreamType(typeName))
-            {
-                return new MemoryStream(File.ReadAllBytes(resolvedPath));
-            }
-
-            // Default (and the common nanoFramework case): raw bytes (System.Byte[]).
+            // Anything that isn't text is read as raw bytes, ignoring the type declared in the resx.
+            // Depending on the VS version, the resource editor declares images as System.Drawing.Bitmap
+            // or as System.Byte[], and other files as System.IO.MemoryStream. Mirrors the .NET Framework
+            // path (ProcessResourceFiles.GetDataNodeValue).
             return File.ReadAllBytes(resolvedPath);
         }
 
@@ -186,11 +184,6 @@ namespace nanoFramework.Tools
         private static bool IsStringType(string typeName)
         {
             return typeName != null && typeName.StartsWith("System.String", StringComparison.Ordinal);
-        }
-
-        private static bool IsMemoryStreamType(string typeName)
-        {
-            return typeName != null && typeName.StartsWith("System.IO.MemoryStream", StringComparison.Ordinal);
         }
 
         #region IResourceReader / IEnumerable / IDisposable

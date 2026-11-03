@@ -314,6 +314,125 @@ namespace nanoFramework.Tools.BuildTasks.Tests
                 Directory.Delete(dir2, true);
             }
         }
+
+        // ─── newer VS resource editors ─────────────────────────────────────────────
+
+        [TestMethod]
+        public void ReadWrite_BitmapDeclaredFileRef_EmittedAsBitmapResource()
+        {
+            // Newer VS resource editors declare linked images as System.Drawing.Bitmap.
+            // The linked file must be read as raw bytes regardless of the declared type.
+            string dir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+            Directory.CreateDirectory(dir);
+            try
+            {
+                File.WriteAllBytes(Path.Combine(dir, "logo.bmp"), MakeOnePxBmp(r: 255, g: 0, b: 0));
+
+                string resxBody = @"
+  <data name=""LogoBitmap"" type=""System.Resources.ResXFileRef, System.Windows.Forms"">
+    <value>logo.bmp;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  </data>";
+
+                var nrf = ReadNanoresources(RunOnResx(dir, resxBody));
+
+                Assert.AreEqual(1, nrf.resources.Length, "expected 1 resource");
+                Assert.AreEqual(
+                    ProcessResourceFiles.NanoResourceFile.ResourceHeader.RESOURCE_Bitmap,
+                    nrf.resources[0].header.kind,
+                    "resource kind should be RESOURCE_Bitmap");
+            }
+            finally
+            {
+                Directory.Delete(dir, true);
+            }
+        }
+
+        [TestMethod]
+        public void ReadWrite_MemoryStreamDeclaredFileRef_EmittedAsBinaryResource()
+        {
+            string dir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+            Directory.CreateDirectory(dir);
+            try
+            {
+                byte[] blob = new byte[] { 0x10, 0x20, 0x30, 0x40 };
+                File.WriteAllBytes(Path.Combine(dir, "sound.wav"), blob);
+
+                string resxBody = @"
+  <data name=""Sound"" type=""System.Resources.ResXFileRef, System.Windows.Forms"">
+    <value>sound.wav;System.IO.MemoryStream, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </data>";
+
+                var nrf = ReadNanoresources(RunOnResx(dir, resxBody));
+
+                Assert.AreEqual(1, nrf.resources.Length, "expected 1 resource");
+                Assert.AreEqual(
+                    ProcessResourceFiles.NanoResourceFile.ResourceHeader.RESOURCE_Binary,
+                    nrf.resources[0].header.kind,
+                    "resource kind should be RESOURCE_Binary");
+                CollectionAssert.AreEqual(blob, nrf.resources[0].data, "binary content mismatch");
+            }
+            finally
+            {
+                Directory.Delete(dir, true);
+            }
+        }
+
+        [TestMethod]
+        public void Read_MissingLinkedFile_Throws()
+        {
+            string dir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+            Directory.CreateDirectory(dir);
+            try
+            {
+                string resxBody = @"
+  <data name=""Missing"" type=""System.Resources.ResXFileRef, System.Windows.Forms"">
+    <value>missing.bin;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </data>";
+
+                // ProcessFile turns this into a "Cannot read linked resource file" build error
+                Assert.ThrowsException<FileNotFoundException>(() => RunOnResx(dir, resxBody));
+            }
+            finally
+            {
+                Directory.Delete(dir, true);
+            }
+        }
+
+        [DataTestMethod]
+        [DataRow("Simple", "Simple")]
+        [DataRow("With.Dots", "With_Dots")]
+        [DataRow("with-dash and space", "with_dash_and_space")]
+        [DataRow("1Leading", "_1Leading")]
+        [DataRow("Name.Ext;0x0010", "Name_Ext;0x0010")]
+        public void SanitizeResourceName_ProducesValidIdentifier(string name, string expected)
+        {
+            Assert.AreEqual(expected, ProcessResourceFiles.SanitizeResourceName(name));
+        }
+
+        [TestMethod]
+        public void CreateStronglyTypedResourcesCode_UsesSanitizedNames()
+        {
+            string dir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+            Directory.CreateDirectory(dir);
+            try
+            {
+                string resxPath = Path.Combine(dir, "Resources.resx");
+                File.WriteAllText(resxPath, ResxHeader + @"
+  <data name=""my-string""><value>hello</value></data>
+  <data name=""2nd.value""><value>world</value></data>" + ResxFooter, Encoding.UTF8);
+
+                string code = new ProcessResourceFiles().CreateStronglyTypedResourcesCode(resxPath, "Resources", "My.App");
+
+                StringAssert.Contains(code, "namespace My.App");
+                StringAssert.Contains(code, "class Resources");
+                StringAssert.Contains(code, "my_string");
+                StringAssert.Contains(code, "_2nd_value");
+            }
+            finally
+            {
+                Directory.Delete(dir, true);
+            }
+        }
     }
 }
 

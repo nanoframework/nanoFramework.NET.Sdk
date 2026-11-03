@@ -27,6 +27,71 @@
   <UsingTask TaskName="nanoFramework.Tools.GenerateNanoResourceTask"
              Condition="'$(NF_MSBUILDTASK_PATH)' != ''"
              AssemblyFile="$(NF_MSBUILDTASK_PATH)\nanoFramework.Tools.BuildTasks.dll" />
+  <UsingTask TaskName="nanoFramework.Tools.GenerateNanoResourceDesignerTask"
+             Condition="'$(NF_MSBUILDTASK_PATH)' == ''"
+             AssemblyFile="$(_NanoBuildTasksDir)nanoFramework.Tools.BuildTasks.dll" />
+  <UsingTask TaskName="nanoFramework.Tools.GenerateNanoResourceDesignerTask"
+             Condition="'$(NF_MSBUILDTASK_PATH)' != ''"
+             AssemblyFile="$(NF_MSBUILDTASK_PATH)\nanoFramework.Tools.BuildTasks.dll" />
+
+  <PropertyGroup>
+    <!-- Back-compat: honor the VS extension's NF_GenerateResourceDesigner if set -->
+    <NanoGenerateResourceDesigner Condition="'$(NanoGenerateResourceDesigner)' == '' and '$(NF_GenerateResourceDesigner)' != ''">$(NF_GenerateResourceDesigner)</NanoGenerateResourceDesigner>
+    <NanoGenerateResourceDesigner Condition="'$(NanoGenerateResourceDesigner)' == ''">true</NanoGenerateResourceDesigner>
+  </PropertyGroup>
+
+  <!--
+    Generate the code-behind (Designer.cs) of .resx files that use the .NET nanoFramework
+    custom tool (Generator = nFResXFileCodeGenerator) when it's missing or older than the .resx.
+    This is what the VS custom tool does when the .resx is saved, so the build works even if
+    the custom tool never ran (file deleted, command line builds, etc). The standard
+    CoreResGen can't do this: it only emits strongly-typed code for items carrying
+    StronglyTypedLanguage, that code targets System.Resources, and the .resx items are
+    removed from its input anyway (see _NanoInterceptResxItems below).
+
+    Runs before _NanoInterceptResxItems (which takes the .resx items out of @(EmbeddedResource))
+    and after PrepareResourceNames (so %(ManifestResourceName) is available for the namespace).
+    Set $(NanoGenerateResourceDesigner) = false to disable it.
+  -->
+  <Target Name="_NanoResourceDesignerPrepare"
+          DependsOnTargets="PrepareResourceNames">
+
+    <ItemGroup>
+      <_NanoResxDesigner Include="@(EmbeddedResource)"
+                         Condition="'%(EmbeddedResource.Generator)' == 'nFResXFileCodeGenerator' and '%(EmbeddedResource.Extension)' == '.resx' and '%(EmbeddedResource.GenerateResource)' != 'false'" />
+
+      <!-- same class name and namespace that VS hands to the custom tool: file name and default namespace of the item folder -->
+      <_NanoResxDesigner>
+        <StronglyTypedClassName>%(_NanoResxDesigner.Filename)</StronglyTypedClassName>
+        <StronglyTypedNamespace Condition="$([System.String]::Copy('%(_NanoResxDesigner.ManifestResourceName)').Contains('.'))">$([System.String]::Copy('%(_NanoResxDesigner.ManifestResourceName)').Substring(0, $([System.String]::Copy('%(_NanoResxDesigner.ManifestResourceName)').LastIndexOf('.'))))</StronglyTypedNamespace>
+      </_NanoResxDesigner>
+      <_NanoResxDesigner Condition="'%(_NanoResxDesigner.LastGenOutput)' != ''">
+        <StronglyTypedFileName>%(_NanoResxDesigner.RootDir)%(_NanoResxDesigner.Directory)%(_NanoResxDesigner.LastGenOutput)</StronglyTypedFileName>
+      </_NanoResxDesigner>
+      <_NanoResxDesigner Condition="'%(_NanoResxDesigner.LastGenOutput)' == ''">
+        <StronglyTypedFileName>%(_NanoResxDesigner.RootDir)%(_NanoResxDesigner.Directory)%(_NanoResxDesigner.Filename).Designer.cs</StronglyTypedFileName>
+      </_NanoResxDesigner>
+
+      <!-- make sure the generated code is compiled, without duplicating what the project already lists -->
+      <_NanoResxDesignerCompile Include="@(_NanoResxDesigner->'%(StronglyTypedFileName)')" />
+      <_NanoResxDesignerCompile Remove="@(Compile->'%(FullPath)')" />
+      <Compile Include="@(_NanoResxDesignerCompile)" />
+    </ItemGroup>
+
+  </Target>
+
+  <Target Name="NanoGenerateResourceDesigner"
+          BeforeTargets="_NanoInterceptResxItems"
+          Condition="'@(EmbeddedResource)' != '' and '$(NanoGenerateResourceDesigner)' == 'true' and '$(DesignTimeBuild)' != 'true'"
+          DependsOnTargets="_NanoResourceDesignerPrepare"
+          Inputs="@(_NanoResxDesigner)"
+          Outputs="@(_NanoResxDesigner->'%(StronglyTypedFileName)')">
+
+    <GenerateNanoResourceDesignerTask Sources="@(_NanoResxDesigner)">
+      <Output TaskParameter="GeneratedFiles" ItemName="_NanoGeneratedResourceDesignerFiles" />
+    </GenerateNanoResourceDesignerTask>
+
+  </Target>
 
   <!--
     Suppress the standard resource pipeline for nanoFramework .resx items.

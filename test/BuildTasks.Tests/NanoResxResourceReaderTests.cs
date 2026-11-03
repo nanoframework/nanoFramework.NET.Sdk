@@ -187,6 +187,36 @@ namespace nanoFramework.Tools.BuildTasks.Tests
             }
         }
 
+        [DataTestMethod]
+        [DataRow("System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a")]
+        [DataRow("System.IO.MemoryStream, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089")]
+        public void Parse_FileRef_NonStringDeclaredType_ReturnsByteArray(string declaredType)
+        {
+            // Newer VS resource editors declare linked files with types other than System.Byte[].
+            // Anything that isn't text is read as raw bytes, matching the .NET Framework path.
+            string dir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+            Directory.CreateDirectory(dir);
+            try
+            {
+                byte[] expected = new byte[] { 0x42, 0x4D, 0x01, 0x02 };
+                File.WriteAllBytes(Path.Combine(dir, "linked.bin"), expected);
+
+                using var reader = ParseResx($@"
+  <data name=""Linked"" type=""System.Resources.ResXFileRef, System.Windows.Forms"">
+    <value>linked.bin;{declaredType}</value>
+  </data>", basePath: dir);
+
+                var resources = ToHashtable(reader);
+
+                Assert.IsInstanceOfType(resources["Linked"], typeof(byte[]));
+                CollectionAssert.AreEqual(expected, (byte[])resources["Linked"]!);
+            }
+            finally
+            {
+                Directory.Delete(dir, true);
+            }
+        }
+
         [TestMethod]
         public void Parse_FileRef_String_ReturnsStringContent()
         {
