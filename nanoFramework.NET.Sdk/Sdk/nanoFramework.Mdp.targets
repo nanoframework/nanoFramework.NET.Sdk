@@ -31,7 +31,7 @@
 
         ResolveReferences  ->  CoreCompile  ->  GenerateNanoPeFile (.pe/.pdbx)
                                                       |
-                              NanoGenerateBinaryOutput / NanoReportChecksum
+                              NanoGenerateBinaryOutput / NanoReportNativeContractHash
                                                       |
                               CopyFilesToOutputDirectory -> NanoCopyOutputFiles
 
@@ -62,7 +62,7 @@
   <PropertyGroup>
     <!-- Back-compat: honor the legacy NanoFrameworkMDPVersion if still set -->
     <NanoMdpVersion Condition="'$(NanoMdpVersion)' == '' and '$(NanoFrameworkMDPVersion)' != ''">$(NanoFrameworkMDPVersion)</NanoMdpVersion>
-    <NanoMdpVersion Condition="'$(NanoMdpVersion)' == ''">4.0.0-preview.98</NanoMdpVersion>
+    <NanoMdpVersion Condition="'$(NanoMdpVersion)' == ''">4.0.0-preview.108</NanoMdpVersion>
   </PropertyGroup>
   <ItemGroup Condition="'$(NF_MDP_MSBUILDTASK_PATH)' == ''">
     <PackageReference Include="nanoFramework.Tools.MetadataProcessor.MsBuildTask"
@@ -231,7 +231,7 @@
         LoadHints="@(ReferencePath);@(ReferenceDependencyPaths);@(ReferenceSatellitePaths)"
         ImportResources="@(_NanoResources)">
       <Output TaskParameter="FilesWritten" ItemName="FileWrites" />
-      <Output TaskParameter="NativeChecksum" PropertyName="NanoNativeMethodsChecksum" />
+      <Output TaskParameter="NativeContractHash" PropertyName="NanoNativeContractHash" />
     </MetaDataProcessorTask>
 
     <!-- Register generated artifacts so Clean removes them (the task also reports
@@ -240,22 +240,22 @@
       <FileWrites Include="$(_NanoMdpCompileOutput);$(_NanoMdpCompileOutputNoExt).pdbx" />
     </ItemGroup>
 
-    <!-- Persist the checksum to a sidecar file so NanoReportChecksum can read it
-         on incremental builds when this target is skipped and NanoNativeMethodsChecksum
-         is not re-populated by the task output. Only written when the checksum is
+    <!-- Persist the native contract hash to a sidecar file so NanoReportNativeContractHash
+         can read it on incremental builds when this target is skipped and NanoNativeContractHash
+         is not re-populated by the task output. Only written when the hash is
          meaningful (non-empty and non-zero, meaning native methods are present). -->
-    <WriteLinesToFile File="$(_NanoMdpCompileOutputNoExt).checksum"
-                      Lines="$(NanoNativeMethodsChecksum)"
+    <WriteLinesToFile File="$(_NanoMdpCompileOutputNoExt).nativecontracthash"
+                      Lines="$(NanoNativeContractHash)"
                       Overwrite="true"
-                      Condition="'$(NanoNativeMethodsChecksum)' != '' and '$(NanoNativeMethodsChecksum)' != '0x00000000'" />
+                      Condition="'$(NanoNativeContractHash)' != '' and '$(NanoNativeContractHash)' != '0x00000000'" />
   </Target>
 
-  <!-- Register the checksum sidecar in FileWrites at evaluation time (not inside
+  <!-- Register the native contract hash sidecar in FileWrites at evaluation time (not inside
        the target) so IncrementalClean does not treat it as an orphan on subsequent
        incremental builds where GenerateNanoPeFile is skipped and the interior
        ItemGroup never runs. Exists() prevents a spurious empty entry on first build. -->
-  <ItemGroup Condition="Exists('$(_NanoMdpCompileOutputNoExt).checksum')">
-    <FileWrites Include="$(_NanoMdpCompileOutputNoExt).checksum" />
+  <ItemGroup Condition="Exists('$(_NanoMdpCompileOutputNoExt).nativecontracthash')">
+    <FileWrites Include="$(_NanoMdpCompileOutputNoExt).nativecontracthash" />
   </ItemGroup>
 
   <!-- ============================================================ -->

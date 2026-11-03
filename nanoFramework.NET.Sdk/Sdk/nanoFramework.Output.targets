@@ -12,7 +12,7 @@
     ********************************************************************************
 
     Produces the deployable binary (GenerateBinaryOutputTask), surfaces the native
-    methods checksum, copies the .pe / .pdbx artifacts to the output directory, and
+    contract hash, copies the .pe / .pdbx artifacts to the output directory, and
     cleans the generated nanoFramework files.
 
     Ordering (hooked via AfterTargets, see nanoFramework.Mdp.targets):
@@ -20,7 +20,7 @@
         -> NanoGenerateBinaryOutput              (deployable .bin; runs BEFORE the
                                                   standard copy so a library's OutDir
                                                   .dll is left intact afterwards)
-        -> NanoReportChecksum                    (surface $(NanoNativeMethodsChecksum))
+        -> NanoReportNativeContractHash          (surface $(NanoNativeContractHash))
       CopyFilesToOutputDirectory (Microsoft.NET.Sdk)
         -> NanoCopyOutputFiles                   (.pe / .pdbx -> OutDir)
         -> _NanoCopyReferencesToIntermediate
@@ -58,28 +58,28 @@
   </Target>
 
   <!-- ============================================================ -->
-  <!--  Surface the native methods checksum                         -->
-  <!--  Reads from the sidecar .checksum file written by            -->
+  <!--  Surface the native contract hash                            -->
+  <!--  Reads from the sidecar .nativecontracthash file written by  -->
   <!--  GenerateNanoPeFile so it works on incremental builds where  -->
-  <!--  the PE step is skipped and NanoNativeMethodsChecksum is not -->
+  <!--  the PE step is skipped and NanoNativeContractHash is not    -->
   <!--  re-populated. Importance="High" ensures the ##vso logging   -->
   <!--  command reaches the Azure Pipelines agent even when MSBuild -->
   <!--  runs at minimal verbosity (/v:m).                           -->
-  <!--  NF_NATIVE_ASSEMBLY_CHECKSUM is a fixed external contract.   -->
+  <!--  NF_NATIVE_CONTRACT_HASH is a fixed external contract.       -->
   <!-- ============================================================ -->
-  <Target Name="NanoReportChecksum"
+  <Target Name="NanoReportNativeContractHash"
           AfterTargets="GenerateNanoPeFile"
-          Condition="Exists('$(_NanoMdpCompileOutputNoExt).checksum')">
-    <ReadLinesFromFile File="$(_NanoMdpCompileOutputNoExt).checksum">
-      <Output TaskParameter="Lines" ItemName="_NanoChecksumLines" />
+          Condition="Exists('$(_NanoMdpCompileOutputNoExt).nativecontracthash')">
+    <ReadLinesFromFile File="$(_NanoMdpCompileOutputNoExt).nativecontracthash">
+      <Output TaskParameter="Lines" ItemName="_NanoNativeContractHashLines" />
     </ReadLinesFromFile>
     <PropertyGroup>
-      <_NanoNativeMethodsChecksumPersisted>@(_NanoChecksumLines)</_NanoNativeMethodsChecksumPersisted>
+      <_NanoNativeContractHashPersisted>@(_NanoNativeContractHashLines)</_NanoNativeContractHashPersisted>
     </PropertyGroup>
-    <Message Text="##vso[task.setvariable variable=NF_NATIVE_ASSEMBLY_CHECKSUM;]$(_NanoNativeMethodsChecksumPersisted)"
+    <Message Text="##vso[task.setvariable variable=NF_NATIVE_CONTRACT_HASH;]$(_NanoNativeContractHashPersisted)"
              Importance="High"
              Condition="'$(TF_BUILD)' == 'True'" />
-    <WriteLinesToFile File="$(GITHUB_ENV)" Lines="NF_NATIVE_ASSEMBLY_CHECKSUM=$(_NanoNativeMethodsChecksumPersisted)"
+    <WriteLinesToFile File="$(GITHUB_ENV)" Lines="NF_NATIVE_CONTRACT_HASH=$(_NanoNativeContractHashPersisted)"
                       Condition="'$(GITHUB_ACTIONS)' == 'True'" />
   </Target>
 

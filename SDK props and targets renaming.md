@@ -139,7 +139,9 @@ chains and `<CallTarget>` calls (all within these same files).
 ### F. Do NOT rename (external / fixed contracts)
 
 - **Env-var overrides** set by devs/CI: `NF_MSBUILDTASK_PATH`, `NF_MDP_MSBUILDTASK_PATH`.
-- **CI output variable** consumed by external pipelines: `NF_NATIVE_ASSEMBLY_CHECKSUM`
+- **CI output variable** consumed by external pipelines: `NF_NATIVE_CONTRACT_HASH`
+  (was `NF_NATIVE_ASSEMBLY_CHECKSUM` until MDP replaced the native checksum with the native
+  contract hash, nanoframework/metadata-processor#248; renamed in step with the VS extension)
   (and the harness-provided `TF_BUILD`, `GITHUB_ACTIONS`, `GITHUB_ENV`).
 - **Compile `#if` symbols:** `NETNANO1_0`, `NANOFRAMEWORK_1_0`.
 - **VS CPS / debugger contract:** `NanoDebugger` (DebuggerFlavor + `Rules\NanoDebugger.xaml`),
