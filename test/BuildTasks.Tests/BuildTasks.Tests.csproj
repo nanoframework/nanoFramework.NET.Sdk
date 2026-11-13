@@ -12,8 +12,8 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
-    <PackageReference Include="MSTest.TestAdapter" Version="3.6.3" />
-    <PackageReference Include="MSTest.TestFramework" Version="3.6.3" />
+    <PackageReference Include="MSTest.TestAdapter" Version="4.5.3" />
+    <PackageReference Include="MSTest.TestFramework" Version="4.5.3" />
     <!-- Microsoft.Build.Framework provides ITaskItem, IBuildEngine used in test infrastructure -->
     <PackageReference Include="Microsoft.Build.Framework" Version="17.14.28" />
   </ItemGroup>

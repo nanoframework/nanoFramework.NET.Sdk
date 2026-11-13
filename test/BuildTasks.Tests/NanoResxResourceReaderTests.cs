@@ -148,7 +148,7 @@ namespace nanoFramework.Tools.BuildTasks.Tests
         [TestMethod]
         public void Parse_UnsupportedMimetype_ThrowsNotSupportedException()
         {
-            Assert.ThrowsException<NotSupportedException>(() =>
+            Assert.ThrowsExactly<NotSupportedException>(() =>
             {
                 using var reader = ParseResx(@"
   <data name=""Obj"" mimetype=""application/x-microsoft.net.object.binary.base64"">
@@ -277,7 +277,7 @@ namespace nanoFramework.Tools.BuildTasks.Tests
         public void Parse_UnsupportedType_ThrowsNotSupportedException()
         {
             // A resource with an explicit non-file-ref, non-string type is unsupported.
-            Assert.ThrowsException<NotSupportedException>(() =>
+            Assert.ThrowsExactly<NotSupportedException>(() =>
             {
                 using var reader = ParseResx(@"
   <data name=""Icon"" type=""System.Drawing.Icon, System.Drawing"">

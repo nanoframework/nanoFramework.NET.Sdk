@@ -390,7 +390,7 @@ namespace nanoFramework.Tools.BuildTasks.Tests
   </data>";
 
                 // ProcessFile turns this into a "Cannot read linked resource file" build error
-                Assert.ThrowsException<FileNotFoundException>(() => RunOnResx(dir, resxBody));
+                Assert.ThrowsExactly<FileNotFoundException>(() => RunOnResx(dir, resxBody));
             }
             finally
             {
