@@ -23,12 +23,10 @@
     <Compile Remove="**\*.cs" />
   </ItemGroup>
 
-  <!-- Import Nerdbank.GitVersioning so this project gets the computed package version. -->
   <ItemGroup>
     <PackageReference Include="Nerdbank.GitVersioning" Version="3.10.94" PrivateAssets="all" />
   </ItemGroup>
 
-  <!-- NuGet package metadata -->
   <PropertyGroup>
     <PackageId>nanoFramework.NET.Sdk</PackageId>
     <Title>nanoFramework .NET SDK</Title>
@@ -86,33 +84,26 @@
       <PackagePath>\</PackagePath>
     </None>
 
-    <!-- SDK props/targets (thin orchestrators) -->
     <None Include="Sdk\Sdk.props" Pack="true" PackagePath="Sdk" />
     <None Include="Sdk\Sdk.targets" Pack="true" PackagePath="Sdk" />
 
-    <!-- SDK modules (focused includes imported by the orchestrators above) -->
     <None Include="Sdk\nanoFramework.Tfm.props" Pack="true" PackagePath="Sdk" />
     <None Include="Sdk\nanoFramework.Mdp.targets" Pack="true" PackagePath="Sdk" />
     <None Include="Sdk\nanoFramework.Resources.targets" Pack="true" PackagePath="Sdk" />
     <None Include="Sdk\nanoFramework.Output.targets" Pack="true" PackagePath="Sdk" />
     <None Include="Sdk\nanoFramework.Capabilities.targets" Pack="true" PackagePath="Sdk" />
 
-    <!-- Debugger property-page rule (NanoDebugger flavor) — surfaced via PropertyPageSchema in Sdk.targets -->
     <None Include="Sdk\Rules\NanoDebugger.xaml" Pack="true" PackagePath="Sdk\Rules" />
 
-    <!-- Build task DLLs for full-framework MSBuild (VS / msbuild.exe) -->
     <None Include="..\nanoFramework.Tools.BuildTasks\bin\$(Configuration)\net472\nanoFramework.Tools.BuildTasks.dll" Pack="true" PackagePath="tasks\net472" />
     <None Include="..\nanoFramework.Tools.BuildTasks\bin\$(Configuration)\net472\nanoFramework.Tools.BuildTasks.pdb" Pack="true" PackagePath="tasks\net472" Condition="Exists('..\nanoFramework.Tools.BuildTasks\bin\$(Configuration)\net472\nanoFramework.Tools.BuildTasks.pdb')" />
 
-    <!-- Build task DLLs for dotnet CLI MSBuild -->
     <None Include="..\nanoFramework.Tools.BuildTasks\bin\$(Configuration)\net8.0\nanoFramework.Tools.BuildTasks.dll" Pack="true" PackagePath="tasks\net8.0" />
     <None Include="..\nanoFramework.Tools.BuildTasks\bin\$(Configuration)\net8.0\nanoFramework.Tools.BuildTasks.pdb" Pack="true" PackagePath="tasks\net8.0" Condition="Exists('..\nanoFramework.Tools.BuildTasks\bin\$(Configuration)\net8.0\nanoFramework.Tools.BuildTasks.pdb')" />
 
-    <!-- Cross-platform resource-processing dependencies, loaded alongside the net8.0 task DLL -->
     <None Include="..\nanoFramework.Tools.BuildTasks\bin\$(Configuration)\net8.0\SixLabors.ImageSharp.dll" Pack="true" PackagePath="tasks\net8.0" />
     <None Include="..\nanoFramework.Tools.BuildTasks\bin\$(Configuration)\net8.0\System.CodeDom.dll" Pack="true" PackagePath="tasks\net8.0" />
 
-    <!-- Package README -->
     <None Include="..\README.md" Pack="true" PackagePath="" />
   </ItemGroup>
 
