@@ -65,6 +65,16 @@ dotnet pack nanoFramework.NET.Sdk\nanoFramework.NET.Sdk.csproj
 
 The resulting `.nupkg` can be tested locally by adding its output directory as a NuGet source.
 
+### Smoke test
+
+The `SmokeTest` project is a library, so its smoke test is to build it with the locally packed SDK and verify resource parity. From the repository root, run:
+
+```powershell
+.\test\SmokeTest\Run-SmokeTest.ps1 -Configuration Release
+```
+
+The runner packs the SDK into `test\SmokeTest\artifacts`, invokes `Create-NuGetConfig.ps1`, restores and builds the project, and runs `Verify-Parity.ps1`. It restores packages into a fresh isolated NuGet cache and verifies the cached SDK package hash matches the just-packed `.nupkg`. It temporarily updates the SDK pin and `NuGet.Config` for SDK resolution, then restores both checked-in files. Resource parity validation requires Visual Studio Build Tools.
+
 ## License
 
 See LICENSE file for details.

@@ -174,26 +174,6 @@ stages:
         versioningScheme: 'off'
         arguments: '--configuration $(buildConfiguration) /p:PublicRelease=true --output $(Build.ArtifactStagingDirectory)'
 
-    - pwsh: |
-        .\sign code azure-key-vault `
-        "**/*.nupkg" `
-        --base-directory "$(Build.ArtifactStagingDirectory)" `
-        --description "$(Build.Repository.Name)" `
-        --description-url "https://github.com/$(Build.Repository.Name)" `
-        --azure-key-vault-tenant-id "$(SignTenantId)" `
-        --azure-key-vault-client-id "$(SignClientId)" `
-        --azure-key-vault-client-secret "$(SignClientSecret)" `
-        --azure-key-vault-certificate "$(SignKeyVaultCertificate)" `
-        --azure-key-vault-url "$(SignKeyVaultUrl)" `
-        --timestamp-url http://timestamp.digicert.com
-      displayName: Sign NuGet package
-      continueOnError: true
-      condition: >-
-        and(
-          succeeded(),
-          eq(variables['System.PullRequest.PullRequestId'], '')
-        )
-
     - task: PublishPipelineArtifact@1
       displayName: Publish NuGet package
       inputs:
@@ -201,68 +181,46 @@ stages:
         artifactName: 'NuGetPackage'
         artifactType: pipeline
 
+- stage: SmokeTest
+  dependsOn: Build
+  jobs:
+  - job: SmokeTest
+    pool:
+      vmImage: 'windows-latest'
+
+    variables:
+      - name: buildPlatform
+        value: 'Any CPU'
+      - name: buildConfiguration
+        value: 'Release'
+
+    steps:
+    - checkout: self
+      submodules: true
+      fetchDepth: 0
+
+    - task: DownloadPipelineArtifact@2
+      displayName: Download SDK package for SmokeTest
+      inputs:
+        artifact: 'NuGetPackage'
+        path: '$(Build.ArtifactStagingDirectory)'
+
     - task: PowerShell@2
       displayName: Create NuGet config for SmokeTest
       inputs:
+        targetType: filePath
+        filePath: 'test/SmokeTest/Create-NuGetConfig.ps1'
+        arguments: '-PackageDirectory "$(Build.ArtifactStagingDirectory)" -SmokeTestDirectory "$(Build.SourcesDirectory)\test\SmokeTest" -ForceGlobalJson -ForceNuGetConfig'
+
+    - task: PowerShell@2
+      displayName: Isolate SmokeTest NuGet package cache
+      inputs:
         targetType: inline
         script: |
-          $sdkPackage = Get-ChildItem -Path "$(Build.ArtifactStagingDirectory)" -Filter "nanoFramework.NET.Sdk.*.nupkg" -File |
-            Where-Object { $_.Name -notlike "*.snupkg" -and $_.Name -notlike "*.symbols.nupkg" } |
-            Sort-Object LastWriteTime -Descending |
-            Select-Object -First 1
-
-          if (-not $sdkPackage)
-          {
-            throw "Couldn't find nanoFramework.NET.Sdk package in $(Build.ArtifactStagingDirectory)."
-          }
-
-          $match = [regex]::Match($sdkPackage.BaseName, '^nanoFramework\.NET\.Sdk\.(.+)$')
-
-          if (-not $match.Success)
-          {
-            throw "Couldn't infer SDK version from package '$($sdkPackage.Name)'."
-          }
-
-          # Use the nbgv CLI to get the authoritative NuGet package version.
-          $sdkVersion = (& nbgv get-version --public-release -v NuGetPackageVersion).Trim()
-
-          if ([string]::IsNullOrWhiteSpace($sdkVersion))
-          {
-            throw "Couldn't determine SDK version via 'nbgv get-version'."
-          }
-
-          Write-Host "Using SmokeTest SDK package: $($sdkPackage.Name)"
-          Write-Host "Using SmokeTest SDK version: $sdkVersion"
-
-          $smokeGlobalJson = @(
-            '{'
-            '  "msbuild-sdks": {'
-            "    ""nanoFramework.NET.Sdk"": ""$sdkVersion"""
-            '  }'
-            '}'
-          )
-
-          $smokeGlobalJson | Set-Content -Path "$(Build.SourcesDirectory)/test/SmokeTest/global.json" -Encoding utf8
-
-          $nugetConfig = @(
-            '<?xml version="1.0" encoding="utf-8"?>'
-            '<configuration>'
-            '  <packageSources>'
-            '    <clear />'
-            '    <add key="local-sdk" value="$(Build.ArtifactStagingDirectory)" />'
-            '    <add key="nuget.org" value="https://api.nuget.org/v3/index.json" />'
-            '  </packageSources>'
-            '  <packageSourceMapping>'
-            '    <packageSource key="local-sdk">'
-            '      <package pattern="nanoFramework.NET.Sdk" />'
-            '    </packageSource>'
-            '    <packageSource key="nuget.org">'
-            '      <package pattern="*" />'
-            '    </packageSource>'
-            '  </packageSourceMapping>'
-            '</configuration>'
-          )
-          $nugetConfig | Set-Content -Path "$(Build.SourcesDirectory)/test/SmokeTest/NuGet.Azdo.Config" -Encoding utf8
+          $cacheDirectory = Join-Path "$(Agent.TempDirectory)" ("nf-smoketest-nuget-" + [Guid]::NewGuid().ToString('N'))
+          Write-Host "##vso[task.setvariable variable=NUGET_PACKAGES]$cacheDirectory"
+          Write-Host "##vso[task.setvariable variable=NF_SMOKETEST_NUGET_PACKAGES]$cacheDirectory"
+          Write-Host "SmokeTest NuGet cache: $cacheDirectory"
 
     - task: DotNetCoreCLI@2
       displayName: Restore SmokeTest
@@ -270,7 +228,45 @@ stages:
         command: 'restore'
         projects: 'test/SmokeTest/SmokeTest.csproj'
         feedsToUse: 'config'
-        nugetConfigPath: '$(Build.SourcesDirectory)/test/SmokeTest/NuGet.Azdo.Config'
+        nugetConfigPath: '$(Build.SourcesDirectory)\test\SmokeTest\NuGet.Azdo.Config'
+
+    - task: PowerShell@2
+      displayName: Verify SmokeTest SDK package
+      inputs:
+        targetType: inline
+        script: |
+          $package = Get-ChildItem -LiteralPath "$(Build.ArtifactStagingDirectory)" -Filter "nanoFramework.NET.Sdk.*.nupkg" -File |
+            Where-Object { $_.Name -notlike "*.snupkg" -and $_.Name -notlike "*.symbols.nupkg" } |
+            Sort-Object LastWriteTime -Descending |
+            Select-Object -First 1
+
+          if (-not $package)
+          {
+            throw "Couldn't find the freshly packed SDK package in $(Build.ArtifactStagingDirectory)."
+          }
+
+          $match = [regex]::Match($package.BaseName, '^nanoFramework\.NET\.Sdk\.(.+)$')
+          if (-not $match.Success)
+          {
+            throw "Couldn't infer SDK version from package '$($package.Name)'."
+          }
+
+          $sdkVersion = $match.Groups[1].Value
+          $resolvedPackageDirectory = Join-Path $env:NUGET_PACKAGES "nanoframework.net.sdk\$sdkVersion"
+          $resolvedPackage = Join-Path $resolvedPackageDirectory "nanoframework.net.sdk.$sdkVersion.nupkg"
+          if (-not (Test-Path -LiteralPath $resolvedPackage -PathType Leaf))
+          {
+            throw "The freshly packed SDK wasn't restored into the isolated NuGet cache: $resolvedPackage"
+          }
+
+          $packedHash = (Get-FileHash -LiteralPath $package.FullName -Algorithm SHA256).Hash
+          $restoredHash = (Get-FileHash -LiteralPath $resolvedPackage -Algorithm SHA256).Hash
+          if ($packedHash -ne $restoredHash)
+          {
+            throw "The SDK package in the isolated NuGet cache doesn't match '$($package.Name)'."
+          }
+
+          Write-Host "Verified SmokeTest uses freshly packed SDK package: $($package.Name) (SHA256 $packedHash)"
 
     - task: DotNetCoreCLI@2
       displayName: Build SmokeTest (dotnet build)
@@ -310,26 +306,105 @@ stages:
         targetType: filePath
         filePath: 'test/SmokeTest/Verify-Parity.ps1'
         arguments: '-Configuration $(buildConfiguration)'
-    
-    - task: NuGetCommand@2
-      condition: >-
-        and(
-          succeeded(),
-          eq(variables['System.PullRequest.PullRequestId'], '')
-        )
-      continueOnError: true
-      displayName: Push NuGet package to NuGet
+
+    - task: PowerShell@2
+      displayName: Remove isolated SmokeTest NuGet cache
+      condition: always()
       inputs:
-        command: push
-        nuGetFeedType: external
-        allowPackageConflicts: true
-        packagesToPush: '$(Build.ArtifactStagingDirectory)/*.nupkg'
-        publishFeedCredentials: 'NuGet-$(System.TeamProject)'
+        targetType: inline
+        script: |
+          $cacheDirectory = $env:NF_SMOKETEST_NUGET_PACKAGES
+          if ([string]::IsNullOrWhiteSpace($cacheDirectory))
+          {
+            return
+          }
+
+          $agentTempDirectory = [System.IO.Path]::GetFullPath("$(Agent.TempDirectory)").TrimEnd('\')
+          $cacheDirectory = [System.IO.Path]::GetFullPath($cacheDirectory)
+          $cacheParent = Split-Path -Parent $cacheDirectory
+          $cacheName = Split-Path -Leaf $cacheDirectory
+          if ($cacheParent -ne $agentTempDirectory -or $cacheName -notmatch '^nf-smoketest-nuget-[0-9a-f]{32}$')
+          {
+            throw "Refusing to remove unexpected SmokeTest NuGet cache path: $cacheDirectory"
+          }
+
+          if (Test-Path -LiteralPath $cacheDirectory)
+          {
+            Remove-Item -LiteralPath $cacheDirectory -Recurse -Force
+          }
+
+- stage: Release_Publish
+  dependsOn: SmokeTest
+  condition: >-
+    and(
+      succeeded(),
+      eq(variables['System.PullRequest.PullRequestId'], ''),
+      not(startsWith(variables['Build.SourceBranch'], 'refs/pull/')),
+      not(startsWith(variables['Build.SourceBranch'], 'refs/tags/v')),
+      eq(variables['StartReleaseCandidate'], false),
+      or(
+        eq(variables['Build.SourceBranchName'], 'main'),
+        eq(variables['Build.SourceBranchName'], 'develop')
+      )
+    )
+  jobs:
+  - job: Release_Publish
+    pool:
+      vmImage: 'windows-latest'
+
+    variables:
+      - group: sign-client-credentials
+
+    steps:
+    - checkout: self
+      fetchDepth: 1
+
+    - task: DownloadPipelineArtifact@2
+      displayName: Download SDK package for release
+      inputs:
+        artifact: 'NuGetPackage'
+        path: '$(Build.ArtifactStagingDirectory)'
+
+    - task: PowerShell@2
+      displayName: Set SDK release version
+      inputs:
+        targetType: inline
+        script: |
+          $package = Get-ChildItem -LiteralPath "$(Build.ArtifactStagingDirectory)" -Filter "$(nugetPackageName).*nupkg" -File |
+            Where-Object { $_.Name -notlike "*.snupkg" -and $_.Name -notlike "*.symbols.nupkg" } |
+            Sort-Object LastWriteTime -Descending |
+            Select-Object -First 1
+
+          if (-not $package)
+          {
+            throw "Couldn't find $(nugetPackageName) package in $(Build.ArtifactStagingDirectory)."
+          }
+
+          $packageName = [regex]::Escape("$(nugetPackageName)")
+          $match = [regex]::Match($package.BaseName, "^$packageName\.(.+)$")
+
+          if (-not $match.Success)
+          {
+            throw "Couldn't infer SDK version from package '$($package.Name)'."
+          }
+
+          $sdkVersion = $match.Groups[1].Value
+          Write-Host "Using SDK release version: $sdkVersion"
+          Write-Host "##vso[task.setvariable variable=MY_NUGET_VERSION]$sdkVersion"
+
+    - template: azure-pipelines-templates/class-lib-publish.yml@templates
+      parameters:
+        baseBranchName: 'main'
+
+    - template: azure-pipelines-templates/create-github-release.yml@templates
 
 # report build failure to Discord
 - stage: Report_Build_Failure
-  dependsOn: Build
-  condition: failed('Build')
+  dependsOn:
+    - Build
+    - SmokeTest
+    - Release_Publish
+  condition: or(failed('Build'), failed('SmokeTest'), failed('Release_Publish'))
 
   jobs:
   - job: Report_Build_Failure

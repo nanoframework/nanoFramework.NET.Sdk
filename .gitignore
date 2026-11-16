@@ -70,3 +70,4 @@ TestResult.xml
 ## macOS
 .DS_Store
 test/SmokeTest/Stubs
+test/SmokeTest/NuGet.Azdo.Config
