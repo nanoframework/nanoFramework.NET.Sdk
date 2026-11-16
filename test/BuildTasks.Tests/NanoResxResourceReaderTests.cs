@@ -187,7 +187,7 @@ namespace nanoFramework.Tools.BuildTasks.Tests
             }
         }
 
-        [DataTestMethod]
+        [TestMethod]
         [DataRow("System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a")]
         [DataRow("System.IO.MemoryStream, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089")]
         public void Parse_FileRef_NonStringDeclaredType_ReturnsByteArray(string declaredType)

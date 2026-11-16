@@ -398,7 +398,7 @@ namespace nanoFramework.Tools.BuildTasks.Tests
             }
         }
 
-        [DataTestMethod]
+        [TestMethod]
         [DataRow("Simple", "Simple")]
         [DataRow("With.Dots", "With_Dots")]
         [DataRow("with-dash and space", "with_dash_and_space")]
